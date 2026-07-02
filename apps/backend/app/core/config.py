@@ -1,0 +1,45 @@
+from functools import lru_cache
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    """Type-validated app config, sourced from environment variables.
+    Missing/invalid required values fail at startup, not mid-request.
+    """
+
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    app_env: str = "development"
+    app_name: str = "SmartSupport AI Platform"
+    api_v1_prefix: str = "/api/v1"
+    debug: bool = False
+
+    secret_key: str = "dev-only-change-me"
+    access_token_expire_minutes: int = 15
+    refresh_token_expire_days: int = 7
+
+    postgres_user: str = "smartsupport"
+    postgres_password: str = "smartsupport"
+    postgres_db: str = "smartsupport"
+    postgres_host: str = "localhost"
+    postgres_port: int = 5432
+
+    chroma_host: str = "localhost"
+    chroma_port: int = 8000
+
+    ai_provider: str = "openai"
+    ai_api_key: str | None = None
+
+    @property
+    def database_url(self) -> str:
+        return (
+            f"postgresql+asyncpg://{self.postgres_user}:{self.postgres_password}"
+            f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
+        )
+
+
+@lru_cache
+def get_settings() -> Settings:
+    """Cached, injectable via FastAPI Depends(get_settings)."""
+    return Settings()
