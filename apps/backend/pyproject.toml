@@ -4,6 +4,10 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
+# B008: FastAPI's dependency injection relies on Depends(...) as an argument
+# default. That's the framework's idiom, not the "mutable default" bug B008
+# is meant to catch.
+ignore = ["B008"]
 
 [tool.mypy]
 python_version = "3.12"

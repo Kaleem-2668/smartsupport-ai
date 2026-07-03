@@ -12,7 +12,7 @@ export default function HomePage() {
         retrieval-augmented generation.
       </p>
       <a
-        href="/login"
+        href="/register"
         className="rounded-lg bg-black px-5 py-2.5 text-sm font-medium text-white transition hover:bg-black/80 dark:bg-white dark:text-black dark:hover:bg-white/80"
       >
         Get started
