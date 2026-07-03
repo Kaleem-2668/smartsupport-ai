@@ -8,7 +8,7 @@ from sqlalchemy.pool import StaticPool
 from app.db.base import Base
 from app.db.session import get_db
 from app.main import create_app
-from app.models import user  # noqa: F401  ensures the table is registered
+from app.models import document, user  # noqa: F401  ensures the tables are registered
 
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
@@ -39,3 +39,19 @@ def client():
         yield test_client
 
     asyncio.run(engine.dispose())
+
+
+@pytest.fixture()
+def auth_headers(client):
+    """Create a user and return authentication headers."""
+    # Register a user
+    client.post(
+        "/api/v1/auth/register",
+        json={"email": "test@example.com", "password": "testpassword123", "full_name": "Test User"},
+    )
+    # Login to get tokens
+    login_response = client.post(
+        "/api/v1/auth/login", json={"email": "test@example.com", "password": "testpassword123"}
+    )
+    access_token = login_response.json()["access_token"]
+    return {"Authorization": f"Bearer {access_token}"}

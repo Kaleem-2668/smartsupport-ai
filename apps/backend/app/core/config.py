@@ -31,6 +31,17 @@ class Settings(BaseSettings):
     ai_provider: str = "openai"
     ai_api_key: str | None = None
 
+    # Document storage settings
+    upload_dir: str = "uploads"
+    max_file_size_mb: int = 10
+    allowed_mime_types: list[str] = [
+        "application/pdf",
+        "text/plain",
+        "text/markdown",
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ]
+
     @property
     def database_url(self) -> str:
         return (

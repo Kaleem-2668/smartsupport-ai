@@ -45,7 +45,7 @@ docker compose up --build
 Actively under development, feature by feature.
 - ✅ [Feature 1: Project Scaffolding](docs/features/01-project-scaffolding.md)
 - ✅ [Feature 2: Authentication & User Management](docs/features/02-authentication.md)
-- ⬜ Feature 3: Document Upload
+- ✅ [Feature 3: Document Upload](docs/features/03-document-upload.md)
 - ⬜ Feature 4: Embedding Pipeline (RAG ingestion)
 - ⬜ Feature 5: RAG Chat
 - ⬜ Feature 6: Knowledge Base Management

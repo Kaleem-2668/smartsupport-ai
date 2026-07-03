@@ -20,3 +20,15 @@ class InvalidTokenError(DomainError):
 
 class UserNotFoundError(DomainError):
     pass
+
+
+class DocumentNotFoundError(DomainError):
+    pass
+
+
+class InvalidFileError(DomainError):
+    pass
+
+
+class StorageError(DomainError):
+    pass
