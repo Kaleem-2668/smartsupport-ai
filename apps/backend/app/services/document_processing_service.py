@@ -57,12 +57,13 @@ class DocumentProcessingService:
             chunk_texts = [chunk["content"] for chunk in chunks]
             embeddings = await self._embedder.generate_embeddings(chunk_texts)
 
-            # Step 4: Store in ChromaDB
+            # Step 4: Store in ChromaDB (using knowledge base collection if available)
             await self._chroma.add_embeddings(
                 user_id=user_id,
                 document_id=document_id,
                 chunks=chunks,
                 embeddings=embeddings,
+                knowledge_base_id=document.knowledge_base_id,
             )
 
             # Step 5: Mark as processed

@@ -33,6 +33,7 @@ class DocumentRepository:
         file_size: int,
         mime_type: str,
         status: str,
+        knowledge_base_id: UUID | None = None,
     ) -> Document:
         document = Document(
             user_id=user_id,
@@ -42,6 +43,7 @@ class DocumentRepository:
             file_size=file_size,
             mime_type=mime_type,
             status=status,
+            knowledge_base_id=knowledge_base_id,
         )
         self._session.add(document)
         await self._session.commit()

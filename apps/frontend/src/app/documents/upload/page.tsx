@@ -1,18 +1,40 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState, type DragEvent, type ChangeEvent } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState, type DragEvent, type ChangeEvent } from "react";
 
 import { ProtectedRoute } from "@/components/ProtectedRoute";
-import { uploadDocument } from "@/lib/api/documents";
+import { getKnowledgeBases, uploadDocument, type KnowledgeBase } from "@/lib/api";
 
 export default function UploadPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const kbIdParam = searchParams.get("kb");
+  
   const [file, setFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBase[]>([]);
+  const [selectedKbId, setSelectedKbId] = useState<string | null>(kbIdParam);
+  const [isLoadingKbs, setIsLoadingKbs] = useState(false);
+
+  useEffect(() => {
+    loadKnowledgeBases();
+  }, []);
+
+  async function loadKnowledgeBases() {
+    setIsLoadingKbs(true);
+    try {
+      const data = await getKnowledgeBases();
+      setKnowledgeBases(data);
+    } catch {
+      // Non-critical error, continue without knowledge bases
+    } finally {
+      setIsLoadingKbs(false);
+    }
+  }
 
   const handleDragOver = (event: DragEvent) => {
     event.preventDefault();
@@ -70,7 +92,7 @@ export default function UploadPage() {
     setError(null);
 
     try {
-      await uploadDocument(file);
+      await uploadDocument(file, selectedKbId || undefined);
       router.push("/documents");
     } catch {
       setError("Failed to upload document. Please try again.");
@@ -126,6 +148,28 @@ export default function UploadPage() {
           </div>
 
           {error && <p className="mb-4 text-sm text-red-500">{error}</p>}
+
+          {knowledgeBases.length > 0 && (
+            <div className="mb-4">
+              <label htmlFor="knowledge-base" className="mb-1 block text-sm font-medium">
+                Knowledge Base (optional)
+              </label>
+              <select
+                id="knowledge-base"
+                value={selectedKbId || ""}
+                onChange={(e) => setSelectedKbId(e.target.value || null)}
+                disabled={isLoadingKbs}
+                className="w-full rounded-lg border border-black/10 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black dark:border-white/15 dark:bg-white/5 dark:focus:ring-white disabled:opacity-50"
+              >
+                <option value="">No knowledge base (default)</option>
+                {knowledgeBases.map((kb) => (
+                  <option key={kb.id} value={kb.id}>
+                    {kb.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {file && (
             <div className="mb-4 rounded-lg bg-black/5 p-3 dark:bg-white/10">

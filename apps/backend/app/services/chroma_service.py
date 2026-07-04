@@ -21,9 +21,13 @@ class ChromaService:
         except Exception as exc:
             raise RuntimeError(f"Failed to initialize ChromaDB client: {exc}") from exc
 
-    def get_or_create_collection(self, user_id: uuid.UUID) -> object:
-        """Get or create a collection for a specific user."""
-        collection_name = f"user_{user_id}"
+    def get_or_create_collection(self, user_id: uuid.UUID, knowledge_base_id: uuid.UUID | None = None) -> object:
+        """Get or create a collection for a specific user and knowledge base.
+        If knowledge_base_id is None, uses the default user collection for backward compatibility."""
+        if knowledge_base_id:
+            collection_name = f"kb_{knowledge_base_id}"
+        else:
+            collection_name = f"user_{user_id}"
         try:
             collection = self._client.get_or_create_collection(
                 name=collection_name,
@@ -39,9 +43,10 @@ class ChromaService:
         document_id: uuid.UUID,
         chunks: list[dict],
         embeddings: list[list[float]],
+        knowledge_base_id: uuid.UUID | None = None,
     ) -> None:
         """Add embeddings to ChromaDB for a document."""
-        collection = self.get_or_create_collection(user_id)
+        collection = self.get_or_create_collection(user_id, knowledge_base_id)
 
         ids = [f"{document_id}_{chunk['index']}" for chunk in chunks]
         documents = [chunk["content"] for chunk in chunks]
@@ -77,10 +82,14 @@ class ChromaService:
             raise RuntimeError(f"Failed to delete embeddings: {exc}") from exc
 
     def search_embeddings(
-        self, user_id: uuid.UUID, query_embedding: list[float], n_results: int = 5
+        self,
+        user_id: uuid.UUID,
+        query_embedding: list[float],
+        n_results: int = 5,
+        knowledge_base_id: uuid.UUID | None = None,
     ) -> dict:
         """Search for similar documents using query embedding."""
-        collection = self.get_or_create_collection(user_id)
+        collection = self.get_or_create_collection(user_id, knowledge_base_id)
 
         try:
             results = collection.query(

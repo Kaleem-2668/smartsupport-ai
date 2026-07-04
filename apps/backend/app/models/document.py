@@ -23,6 +23,9 @@ class Document(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(
         Uuid(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
+    knowledge_base_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("knowledge_bases.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     filename: Mapped[str] = mapped_column(String(255), nullable=False)
     original_filename: Mapped[str] = mapped_column(String(255), nullable=False)
     file_path: Mapped[str] = mapped_column(String(512), nullable=False)

@@ -76,6 +76,7 @@ class DocumentService:
             file_size=data.file_size,
             mime_type=data.mime_type,
             status=DocumentStatus.READY,
+            knowledge_base_id=data.knowledge_base_id,
         )
 
         return document

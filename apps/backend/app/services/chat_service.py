@@ -61,13 +61,16 @@ class ChatService:
             raise ConversationNotFoundError(f"Conversation with ID {conversation_id} not found")
         return conversation
 
-    async def _retrieve_context(self, user_id: uuid.UUID, question: str) -> tuple[str, list[dict]]:
+    async def _retrieve_context(
+        self, user_id: uuid.UUID, question: str, knowledge_base_id: uuid.UUID | None = None
+    ) -> tuple[str, list[dict]]:
         """Return (formatted context string, source metadata list) for the given question."""
         query_embedding = await self._embedder.generate_query_embedding(question)
         results = self._chroma.search_embeddings(
             user_id=user_id,
             query_embedding=query_embedding,
             n_results=settings.chat_retrieval_top_k,
+            knowledge_base_id=knowledge_base_id,
         )
 
         documents = results.get("documents") or [[]]
@@ -93,7 +96,11 @@ class ChatService:
         return "\n\n---\n\n".join(context_parts), sources
 
     async def ask(
-        self, user_id: uuid.UUID, question: str, conversation_id: uuid.UUID | None
+        self,
+        user_id: uuid.UUID,
+        question: str,
+        conversation_id: uuid.UUID | None,
+        knowledge_base_id: uuid.UUID | None = None,
     ) -> tuple[uuid.UUID, Message]:
         """Answer a question, persisting both the user's message and the assistant's reply."""
         self._ensure_ai_services()
@@ -103,7 +110,7 @@ class ChatService:
             conversation_id=conversation.id, role=MessageRole.USER.value, content=question
         )
 
-        context, sources = await self._retrieve_context(user_id, question)
+        context, sources = await self._retrieve_context(user_id, question, knowledge_base_id)
         system_prompt = SYSTEM_PROMPT_TEMPLATE.format(context=context)
 
         try:

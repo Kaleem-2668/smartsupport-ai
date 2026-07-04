@@ -27,12 +27,14 @@ async def ask_question(
     current_user: User = Depends(get_current_user),
     chat_service: ChatService = Depends(get_chat_service),
 ) -> ChatResponse:
-    """Ask a question against the knowledge base. Creates a new conversation if none given."""
+    """Ask a question against the knowledge base. Creates a new conversation if none given.
+    Optionally specify a knowledge_base_id to search within a specific knowledge base."""
     try:
         conversation_id, message = await chat_service.ask(
             user_id=current_user.id,
             question=payload.question,
             conversation_id=payload.conversation_id,
+            knowledge_base_id=payload.knowledge_base_id,
         )
         return ChatResponse(
             conversation_id=conversation_id,

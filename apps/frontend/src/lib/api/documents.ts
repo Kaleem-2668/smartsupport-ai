@@ -3,6 +3,7 @@ import { apiClient } from "./client";
 export interface Document {
   id: string;
   user_id: string;
+  knowledge_base_id: string | null;
   filename: string;
   original_filename: string;
   file_path: string;
@@ -16,9 +17,12 @@ export interface Document {
   updated_at: string;
 }
 
-export async function uploadDocument(file: File): Promise<Document> {
+export async function uploadDocument(file: File, knowledgeBaseId?: string): Promise<Document> {
   const formData = new FormData();
   formData.append("file", file);
+  if (knowledgeBaseId) {
+    formData.append("knowledge_base_id", knowledgeBaseId);
+  }
 
   const { data } = await apiClient.post<Document>("/documents/upload", formData, {
     headers: {

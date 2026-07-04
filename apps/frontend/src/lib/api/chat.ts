@@ -30,11 +30,13 @@ export interface ChatResponse {
 
 export async function askQuestion(
   question: string,
-  conversationId?: string | null
+  conversationId?: string | null,
+  knowledgeBaseId?: string | null
 ): Promise<ChatResponse> {
   const { data } = await apiClient.post<ChatResponse>("/chat", {
     question,
     conversation_id: conversationId ?? undefined,
+    knowledge_base_id: knowledgeBaseId ?? undefined,
   });
   return data;
 }

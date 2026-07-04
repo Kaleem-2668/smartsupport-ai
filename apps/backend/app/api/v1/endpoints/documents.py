@@ -27,10 +27,11 @@ def get_document_processing_service(db: AsyncSession = Depends(get_db)) -> Docum
 @router.post("/upload", response_model=DocumentRead, status_code=status.HTTP_201_CREATED)
 async def upload_document(
     file: UploadFile = File(...),
+    knowledge_base_id: uuid.UUID | None = None,
     current_user: User = Depends(get_current_user),
     document_service: DocumentService = Depends(get_document_service),
 ) -> Document:
-    """Upload a document. Validates file size and type."""
+    """Upload a document. Validates file size and type. Optionally assign to a knowledge base."""
     try:
         file_content = await file.read()
         
@@ -39,6 +40,7 @@ async def upload_document(
             original_filename=file.filename or "unknown",
             file_size=len(file_content),
             mime_type=file.content_type or "application/octet-stream",
+            knowledge_base_id=knowledge_base_id,
         )
         
         return await document_service.upload_document(

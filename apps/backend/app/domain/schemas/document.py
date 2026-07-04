@@ -19,7 +19,7 @@ class DocumentBase(BaseModel):
 
 
 class DocumentCreate(DocumentBase):
-    pass
+    knowledge_base_id: uuid.UUID | None = None
 
 
 class DocumentRead(BaseModel):
@@ -27,6 +27,7 @@ class DocumentRead(BaseModel):
 
     id: uuid.UUID
     user_id: uuid.UUID
+    knowledge_base_id: uuid.UUID | None
     filename: str
     original_filename: str
     file_path: str

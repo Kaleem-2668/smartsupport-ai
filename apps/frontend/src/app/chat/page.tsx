@@ -11,6 +11,7 @@ import {
   type Conversation,
   type Message,
 } from "@/lib/api/chat";
+import { getKnowledgeBases, type KnowledgeBase } from "@/lib/api/knowledge-bases";
 
 function ChatContent() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -22,9 +23,13 @@ function ChatContent() {
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBase[]>([]);
+  const [selectedKbId, setSelectedKbId] = useState<string | null>(null);
+  const [isLoadingKbs, setIsLoadingKbs] = useState(false);
 
   useEffect(() => {
     loadConversations();
+    loadKnowledgeBases();
   }, []);
 
   useEffect(() => {
@@ -40,6 +45,18 @@ function ChatContent() {
       setError("Failed to load conversations.");
     } finally {
       setIsLoadingConversations(false);
+    }
+  }
+
+  async function loadKnowledgeBases() {
+    setIsLoadingKbs(true);
+    try {
+      const data = await getKnowledgeBases();
+      setKnowledgeBases(data);
+    } catch {
+      // Non-critical error, continue without knowledge bases
+    } finally {
+      setIsLoadingKbs(false);
     }
   }
 
@@ -94,7 +111,7 @@ function ChatContent() {
     setMessages((prev) => [...prev, optimisticUserMessage]);
 
     try {
-      const response = await askQuestion(question, activeConversationId);
+      const response = await askQuestion(question, activeConversationId, selectedKbId || undefined);
       const isNewConversation = activeConversationId === null;
       setActiveConversationId(response.conversation_id);
       setMessages((prev) => [
@@ -137,6 +154,27 @@ function ChatContent() {
             New chat
           </button>
         </div>
+        {knowledgeBases.length > 0 && (
+          <div className="px-4 pb-4">
+            <label htmlFor="kb-select" className="mb-1 block text-xs font-medium text-black/60 dark:text-white/60">
+              Knowledge Base
+            </label>
+            <select
+              id="kb-select"
+              value={selectedKbId || ""}
+              onChange={(e) => setSelectedKbId(e.target.value || null)}
+              disabled={isLoadingKbs}
+              className="w-full rounded-lg border border-black/10 px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-black dark:border-white/15 dark:bg-white/5 dark:focus:ring-white disabled:opacity-50"
+            >
+              <option value="">All documents</option>
+              {knowledgeBases.map((kb) => (
+                <option key={kb.id} value={kb.id}>
+                  {kb.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <div className="flex-1 overflow-y-auto px-2 pb-4">
           {isLoadingConversations ? (
             <p className="px-2 text-sm text-black/50 dark:text-white/50">Loading…</p>

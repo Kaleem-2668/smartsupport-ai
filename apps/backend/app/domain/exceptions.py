@@ -40,3 +40,7 @@ class ConversationNotFoundError(DomainError):
 
 class LLMError(DomainError):
     pass
+
+
+class KnowledgeBaseNotFoundError(DomainError):
+    pass

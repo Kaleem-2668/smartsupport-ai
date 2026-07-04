@@ -34,6 +34,7 @@ class ConversationRead(BaseModel):
 class ChatRequest(BaseModel):
     question: str = Field(..., min_length=1, max_length=4000)
     conversation_id: uuid.UUID | None = None
+    knowledge_base_id: uuid.UUID | None = None
 
 
 class ChatResponse(BaseModel):
