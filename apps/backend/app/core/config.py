@@ -30,6 +30,8 @@ class Settings(BaseSettings):
 
     ai_provider: str = "openai"
     ai_api_key: str | None = None
+    ai_model: str = "text-embedding-3-small"
+    ai_embedding_dimensions: int = 1536
 
     # Document storage settings
     upload_dir: str = "uploads"
@@ -41,6 +43,10 @@ class Settings(BaseSettings):
         "application/msword",
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     ]
+
+    # Embedding settings
+    chunk_size: int = 1000
+    chunk_overlap: int = 200
 
     @property
     def database_url(self) -> str:

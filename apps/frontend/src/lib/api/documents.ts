@@ -10,6 +10,8 @@ export interface Document {
   mime_type: string;
   status: string;
   error_message: string | null;
+  chunk_count: number | null;
+  processed_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -38,4 +40,9 @@ export async function getDocument(documentId: string): Promise<Document> {
 
 export async function deleteDocument(documentId: string): Promise<void> {
   await apiClient.delete(`/documents/${documentId}`);
+}
+
+export async function processDocument(documentId: string): Promise<Document> {
+  const { data } = await apiClient.post<Document>(`/documents/${documentId}/process`);
+  return data;
 }

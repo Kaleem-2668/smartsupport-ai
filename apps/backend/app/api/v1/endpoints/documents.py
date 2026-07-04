@@ -10,6 +10,7 @@ from app.domain.schemas.document import DocumentCreate, DocumentRead
 from app.models.document import Document
 from app.models.user import User
 from app.repositories.document_repository import DocumentRepository
+from app.services.document_processing_service import DocumentProcessingService
 from app.services.document_service import DocumentService
 
 router = APIRouter(prefix="/documents", tags=["documents"])
@@ -17,6 +18,10 @@ router = APIRouter(prefix="/documents", tags=["documents"])
 
 def get_document_service(db: AsyncSession = Depends(get_db)) -> DocumentService:
     return DocumentService(DocumentRepository(db))
+
+
+def get_document_processing_service(db: AsyncSession = Depends(get_db)) -> DocumentProcessingService:
+    return DocumentProcessingService(DocumentRepository(db))
 
 
 @router.post("/upload", response_model=DocumentRead, status_code=status.HTTP_201_CREATED)
@@ -88,3 +93,16 @@ async def delete_document(
         await document_service.delete_document(document_id)
     except DocumentNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+@router.post("/{document_id}/process", response_model=DocumentRead)
+async def process_document(
+    document_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    processing_service: DocumentProcessingService = Depends(get_document_processing_service),
+) -> Document:
+    """Process a document to extract text, generate embeddings, and store in ChromaDB."""
+    try:
+        return await processing_service.process_document(document_id, current_user.id)
+    except (InvalidFileError, StorageError) as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc

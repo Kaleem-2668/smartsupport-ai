@@ -34,6 +34,8 @@ class DocumentRead(BaseModel):
     mime_type: str
     status: str
     error_message: str | None
+    chunk_count: int | None
+    processed_at: datetime | None
     created_at: datetime
     updated_at: datetime
 

@@ -4,13 +4,14 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { ProtectedRoute } from "@/components/ProtectedRoute";
-import { deleteDocument, getDocuments, type Document } from "@/lib/api/documents";
+import { deleteDocument, getDocuments, processDocument, type Document } from "@/lib/api/documents";
 
 function DocumentsContent() {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [processingId, setProcessingId] = useState<string | null>(null);
 
   useEffect(() => {
     loadDocuments();
@@ -38,6 +39,19 @@ function DocumentsContent() {
       setError("Failed to delete document. Please try again.");
     } finally {
       setDeletingId(null);
+    }
+  }
+
+  async function handleProcess(documentId: string) {
+    setProcessingId(documentId);
+    setError(null);
+    try {
+      const processed = await processDocument(documentId);
+      setDocuments((docs) => docs.map((doc) => (doc.id === documentId ? processed : doc)));
+    } catch {
+      setError("Failed to process document. Please try again.");
+    } finally {
+      setProcessingId(null);
     }
   }
 
@@ -116,6 +130,7 @@ function DocumentsContent() {
                   <th className="px-4 py-3 font-medium">Type</th>
                   <th className="px-4 py-3 font-medium">Uploaded</th>
                   <th className="px-4 py-3 font-medium">Status</th>
+                  <th className="px-4 py-3 font-medium">Chunks</th>
                   <th className="px-4 py-3 font-medium">Actions</th>
                 </tr>
               </thead>
@@ -140,6 +155,8 @@ function DocumentsContent() {
                         className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${
                           document.status === "ready"
                             ? "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-400"
+                            : document.status === "processing"
+                            ? "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-400"
                             : document.status === "error"
                             ? "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400"
                             : "bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-400"
@@ -148,14 +165,28 @@ function DocumentsContent() {
                         {document.status}
                       </span>
                     </td>
+                    <td className="px-4 py-3 text-black/60 dark:text-white/60">
+                      {document.chunk_count ?? "-"}
+                    </td>
                     <td className="px-4 py-3">
-                      <button
-                        onClick={() => handleDelete(document.id)}
-                        disabled={deletingId === document.id}
-                        className="text-sm font-medium text-red-600 transition hover:text-red-700 disabled:opacity-50 dark:text-red-400 dark:hover:text-red-300"
-                      >
-                        {deletingId === document.id ? "Deleting…" : "Delete"}
-                      </button>
+                      <div className="flex gap-2">
+                        {document.status === "ready" && document.chunk_count === null && (
+                          <button
+                            onClick={() => handleProcess(document.id)}
+                            disabled={processingId === document.id}
+                            className="text-sm font-medium text-blue-600 transition hover:text-blue-700 disabled:opacity-50 dark:text-blue-400 dark:hover:text-blue-300"
+                          >
+                            {processingId === document.id ? "Processing…" : "Process"}
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleDelete(document.id)}
+                          disabled={deletingId === document.id || processingId === document.id}
+                          className="text-sm font-medium text-red-600 transition hover:text-red-700 disabled:opacity-50 dark:text-red-400 dark:hover:text-red-300"
+                        >
+                          {deletingId === document.id ? "Deleting…" : "Delete"}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

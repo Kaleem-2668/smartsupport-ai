@@ -1,3 +1,4 @@
+from datetime import datetime
 from uuid import UUID
 
 from sqlalchemy import delete, select
@@ -47,7 +48,13 @@ class DocumentRepository:
         await self._session.refresh(document)
         return document
 
-    async def update_status(self, document_id: UUID, status: str, error_message: str | None = None) -> Document | None:
+    async def update_status(
+        self,
+        document_id: UUID,
+        status: str,
+        error_message: str | None = None,
+        chunk_count: int | None = None,
+    ) -> Document | None:
         result = await self._session.execute(select(Document).where(Document.id == document_id))
         document = result.scalar_one_or_none()
         if document is None:
@@ -55,6 +62,20 @@ class DocumentRepository:
         document.status = status
         if error_message is not None:
             document.error_message = error_message
+        if chunk_count is not None:
+            document.chunk_count = chunk_count
+        await self._session.commit()
+        await self._session.refresh(document)
+        return document
+
+    async def mark_processed(self, document_id: UUID, chunk_count: int) -> Document | None:
+        result = await self._session.execute(select(Document).where(Document.id == document_id))
+        document = result.scalar_one_or_none()
+        if document is None:
+            return None
+        document.status = "ready"
+        document.chunk_count = chunk_count
+        document.processed_at = datetime.now()
         await self._session.commit()
         await self._session.refresh(document)
         return document

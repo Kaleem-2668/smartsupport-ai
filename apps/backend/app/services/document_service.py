@@ -97,5 +97,16 @@ class DocumentService:
         if document is None:
             raise DocumentNotFoundError(f"Document with ID {document_id} not found")
 
+        # Delete embeddings from ChromaDB if document was processed
+        if document.chunk_count and document.chunk_count > 0:
+            from app.services.chroma_service import ChromaService
+
+            chroma = ChromaService()
+            try:
+                await chroma.delete_document_embeddings(document.user_id, document_id)
+            except Exception:
+                # Log but don't fail the deletion if embedding cleanup fails
+                pass
+
         await self.delete_file(document.file_path)
         await self._documents.delete(document_id)
