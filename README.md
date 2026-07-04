@@ -47,7 +47,7 @@ Actively under development, feature by feature.
 - ✅ [Feature 2: Authentication & User Management](docs/features/02-authentication.md)
 - ✅ [Feature 3: Document Upload](docs/features/03-document-upload.md)
 - ✅ [Feature 4: Embedding Pipeline (RAG ingestion)](docs/features/04-embedding-pipeline.md)
-- ⬜ Feature 5: RAG Chat
+- ✅ [Feature 5: RAG Chat](docs/features/05-rag-chat.md)
 - ⬜ Feature 6: Knowledge Base Management
 - ⬜ Feature 7: Dashboard & Analytics
 - ⬜ Feature 8: Deployment

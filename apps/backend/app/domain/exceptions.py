@@ -32,3 +32,11 @@ class InvalidFileError(DomainError):
 
 class StorageError(DomainError):
     pass
+
+
+class ConversationNotFoundError(DomainError):
+    pass
+
+
+class LLMError(DomainError):
+    pass

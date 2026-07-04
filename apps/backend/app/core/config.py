@@ -33,6 +33,11 @@ class Settings(BaseSettings):
     ai_model: str = "text-embedding-3-small"
     ai_embedding_dimensions: int = 1536
 
+    # Chat completion settings
+    ai_chat_model: str = "gpt-4o-mini"
+    ai_chat_temperature: float = 0.2
+    chat_retrieval_top_k: int = 4
+
     # Document storage settings
     upload_dir: str = "uploads"
     max_file_size_mb: int = 10

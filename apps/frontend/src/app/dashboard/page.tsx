@@ -19,8 +19,14 @@ function DashboardContent() {
 
       <div className="flex gap-4">
         <Link
-          href="/documents"
+          href="/chat"
           className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white transition hover:bg-black/80 dark:bg-white dark:text-black dark:hover:bg-white/80"
+        >
+          Open Chat
+        </Link>
+        <Link
+          href="/documents"
+          className="rounded-lg border border-black/10 px-4 py-2 text-sm font-medium transition hover:bg-black/5 dark:border-white/15 dark:hover:bg-white/10"
         >
           View Documents
         </Link>

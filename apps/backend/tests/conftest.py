@@ -8,7 +8,7 @@ from sqlalchemy.pool import StaticPool
 from app.db.base import Base
 from app.db.session import get_db
 from app.main import create_app
-from app.models import document, user  # noqa: F401  ensures the tables are registered
+from app.models import conversation, document, message, user  # noqa: F401 registers ORM tables
 
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
