@@ -148,3 +148,40 @@ def test_cannot_access_another_users_conversation(client, auth_headers):
         f"/api/v1/conversations/{conversation_id}/messages", headers=other_headers
     )
     assert response.status_code == 404
+
+
+def test_ask_with_knowledge_base_id(client, auth_headers):
+    """Test that chat accepts a knowledge_base_id parameter."""
+    response = client.post(
+        "/api/v1/chat",
+        headers=auth_headers,
+        json={"question": "What is the return policy?", "knowledge_base_id": str(uuid.uuid4())},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["message"]["role"] == "assistant"
+    assert "Fake answer" in body["message"]["content"]
+
+
+def test_conversations_isolation_between_users(client, auth_headers):
+    """User A should not see User B's conversations in the list."""
+    # User A asks a question
+    client.post("/api/v1/chat", headers=auth_headers, json={"question": "Hello from A"})
+
+    # Register User B
+    client.post(
+        "/api/v1/auth/register",
+        json={"email": "convo_b@example.com", "password": "testpassword123"},
+    )
+    login_b = client.post(
+        "/api/v1/auth/login", json={"email": "convo_b@example.com", "password": "testpassword123"}
+    )
+    headers_b = {"Authorization": f"Bearer {login_b.json()['access_token']}"}
+
+    # User A has 1 conversation
+    response_a = client.get("/api/v1/conversations", headers=auth_headers)
+    assert len(response_a.json()) == 1
+
+    # User B has 0 conversations
+    response_b = client.get("/api/v1/conversations", headers=headers_b)
+    assert len(response_b.json()) == 0
