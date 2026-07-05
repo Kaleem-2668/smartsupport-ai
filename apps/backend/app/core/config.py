@@ -53,6 +53,13 @@ class Settings(BaseSettings):
     chunk_size: int = 1000
     chunk_overlap: int = 200
 
+    # CORS settings
+    cors_origins_str: str = "http://localhost:3000"
+
+    @property
+    def cors_origins(self) -> list[str]:
+        return [origin.strip() for origin in self.cors_origins_str.split(",")]
+
     @property
     def database_url(self) -> str:
         return (
