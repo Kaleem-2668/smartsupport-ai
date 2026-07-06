@@ -33,6 +33,7 @@ dmypy.json
 .env
 .env.local
 .env.*.local
+.env.production
 
 # IDE
 .vscode/

@@ -1,12 +1,7 @@
 {
+  "version": 2,
   "buildCommand": "npm run build",
   "outputDirectory": ".next",
   "framework": "nextjs",
-  "regions": ["iad1"],
-  "env": {
-    "NEXT_PUBLIC_API_URL": {
-      "description": "Backend API URL",
-      "value": "https://your-backend-url.railway.app/api/v1"
-    }
-  }
+  "installCommand": "npm install"
 }

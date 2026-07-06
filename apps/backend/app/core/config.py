@@ -53,15 +53,24 @@ class Settings(BaseSettings):
     chunk_size: int = 1000
     chunk_overlap: int = 200
 
+    # ChromaDB mode: "http" for external server, "embedded" for in-process
+    chroma_mode: str = "http"
+    chroma_data_path: str = "/app/chroma_data"
+
     # CORS settings
-    cors_origins_str: str = "http://localhost:3000"
+    cors_origins: str = "http://localhost:3000"
+
+    # Optional full DATABASE_URL override (Railway, Render, etc. set this)
+    database_url_override: str | None = None
 
     @property
-    def cors_origins(self) -> list[str]:
-        return [origin.strip() for origin in self.cors_origins_str.split(",")]
+    def cors_origins_list(self) -> list[str]:
+        return [origin.strip() for origin in self.cors_origins.split(",")]
 
     @property
     def database_url(self) -> str:
+        if self.database_url_override:
+            return self.database_url_override
         return (
             f"postgresql+asyncpg://{self.postgres_user}:{self.postgres_password}"
             f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"

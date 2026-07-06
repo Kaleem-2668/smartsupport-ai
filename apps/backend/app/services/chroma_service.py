@@ -13,11 +13,19 @@ class ChromaService:
         self._initialize_client()
 
     def _initialize_client(self) -> None:
-        """Initialize ChromaDB client."""
+        """Initialize ChromaDB client.
+        
+        Supports two modes:
+        - "http": Connects to an external ChromaDB server (default for production with separate service)
+        - "embedded": Uses ChromaDB in-process with persistent storage (for Railway free tier)
+        """
         try:
             import chromadb
 
-            self._client = chromadb.HttpClient(host=settings.chroma_host, port=settings.chroma_port)
+            if settings.chroma_mode == "embedded":
+                self._client = chromadb.PersistentClient(path=settings.chroma_data_path)
+            else:
+                self._client = chromadb.HttpClient(host=settings.chroma_host, port=settings.chroma_port)
         except Exception as exc:
             raise RuntimeError(f"Failed to initialize ChromaDB client: {exc}") from exc
 
