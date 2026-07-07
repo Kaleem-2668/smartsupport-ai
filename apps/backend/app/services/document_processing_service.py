@@ -58,7 +58,9 @@ class DocumentProcessingService:
             embeddings = await self._embedder.generate_embeddings(chunk_texts)
 
             # Step 4: Store in ChromaDB (using knowledge base collection if available)
-            await self._chroma.add_embeddings(
+            # ChromaService methods are synchronous (the chromadb client is sync),
+            # so this is a plain call, not awaited.
+            self._chroma.add_embeddings(
                 user_id=user_id,
                 document_id=document_id,
                 chunks=chunks,
@@ -81,6 +83,6 @@ class DocumentProcessingService:
     async def delete_document_embeddings(self, document_id: uuid.UUID, user_id: uuid.UUID) -> None:
         """Delete embeddings for a document from ChromaDB."""
         try:
-            await self._chroma.delete_document_embeddings(user_id, document_id)
+            self._chroma.delete_document_embeddings(user_id, document_id)
         except Exception as exc:
             raise StorageError(f"Failed to delete embeddings: {exc}") from exc

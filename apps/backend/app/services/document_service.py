@@ -104,7 +104,7 @@ class DocumentService:
 
             chroma = ChromaService()
             try:
-                await chroma.delete_document_embeddings(document.user_id, document_id)
+                chroma.delete_document_embeddings(document.user_id, document_id)
             except Exception:
                 # Log but don't fail the deletion if embedding cleanup fails
                 pass
