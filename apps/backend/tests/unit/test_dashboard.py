@@ -11,7 +11,7 @@ class _FakeEmbedder:
 
 
 class _FakeChroma:
-    def search_embeddings(self, user_id, query_embedding, n_results=4):
+    def search_embeddings(self, user_id, query_embedding, n_results=4, knowledge_base_id=None):
         return {"documents": [[]], "metadatas": [[]]}
 
 

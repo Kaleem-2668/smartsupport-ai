@@ -2,12 +2,12 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState, type DragEvent, type ChangeEvent } from "react";
+import { Suspense, useEffect, useState, type DragEvent, type ChangeEvent } from "react";
 
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { getKnowledgeBases, uploadDocument, type KnowledgeBase } from "@/lib/api";
 
-export default function UploadPage() {
+function UploadPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const kbIdParam = searchParams.get("kb");
@@ -196,5 +196,13 @@ export default function UploadPage() {
         </div>
       </main>
     </ProtectedRoute>
+  );
+}
+
+export default function UploadPage() {
+  return (
+    <Suspense fallback={null}>
+      <UploadPageContent />
+    </Suspense>
   );
 }
