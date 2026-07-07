@@ -15,6 +15,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+      start_period: 30s
 
   chromadb:
     image: chromadb/chroma:0.5.15
@@ -49,10 +50,6 @@ services:
       - "3000:3000"
     depends_on:
       - backend
-    volumes:
-      - ../apps/frontend:/app
-      - /app/node_modules
-
 volumes:
   postgres_data:
   chroma_data:
