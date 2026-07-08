@@ -14,6 +14,8 @@ class EmbeddingService:
         """Initialize the embedding function based on provider."""
         if settings.ai_provider == "openai":
             self._initialize_openai()
+        elif settings.ai_provider == "gemini":
+            self._initialize_gemini()
         else:
             raise ValueError(f"Unsupported AI provider: {settings.ai_provider}")
 
@@ -31,6 +33,21 @@ class EmbeddingService:
             )
         except Exception as exc:
             raise RuntimeError(f"Failed to initialize OpenAI embeddings: {exc}") from exc
+
+    def _initialize_gemini(self) -> None:
+        """Initialize Google Gemini embedding function."""
+        try:
+            from langchain_google_genai import GoogleGenerativeAIEmbeddings
+
+            if not settings.ai_api_key:
+                raise ValueError("AI_API_KEY is required for Gemini embeddings")
+
+            self._embedding_function = GoogleGenerativeAIEmbeddings(
+                model=settings.ai_model,
+                google_api_key=settings.ai_api_key,
+            )
+        except Exception as exc:
+            raise RuntimeError(f"Failed to initialize Gemini embeddings: {exc}") from exc
 
     async def generate_embeddings(self, texts: list[str]) -> list[list[float]]:
         """Generate embeddings for a list of texts."""
