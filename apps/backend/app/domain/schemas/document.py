@@ -36,6 +36,8 @@ class DocumentRead(BaseModel):
     status: str
     error_message: str | None
     chunk_count: int | None
+    summary: str | None
+    suggested_questions: list[str] | None
     processed_at: datetime | None
     created_at: datetime
     updated_at: datetime
@@ -44,3 +46,9 @@ class DocumentRead(BaseModel):
 class DocumentUpdate(BaseModel):
     status: str | None = None
     error_message: str | None = None
+
+
+class RelatedDocument(BaseModel):
+    document_id: uuid.UUID
+    filename: str
+    similarity: float

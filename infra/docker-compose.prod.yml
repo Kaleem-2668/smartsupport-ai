@@ -7,16 +7,16 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     environment:
-      POSTGRES_USER: smartsupport
+      POSTGRES_USER: orin
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
-      POSTGRES_DB: smartsupport
+      POSTGRES_DB: orin
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U smartsupport"]
+      test: ["CMD-SHELL", "pg_isready -U orin"]
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
-      - smartsupport-net
+      - orin-net
 
   chromadb:
     image: chromadb/chroma:0.5.15
@@ -32,7 +32,7 @@ services:
       timeout: 10s
       retries: 3
     networks:
-      - smartsupport-net
+      - orin-net
 
   backend:
     build:
@@ -62,7 +62,7 @@ services:
       timeout: 10s
       retries: 3
     networks:
-      - smartsupport-net
+      - orin-net
 
   frontend:
     build:
@@ -72,9 +72,9 @@ services:
     depends_on:
       - backend
     environment:
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://api.smartsupport.example.com}
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://api.orin.example.com}
     networks:
-      - smartsupport-net
+      - orin-net
 
   nginx:
     image: nginx:alpine
@@ -88,7 +88,7 @@ services:
       - backend
       - frontend
     networks:
-      - smartsupport-net
+      - orin-net
 
 volumes:
   postgres_data:
@@ -96,5 +96,5 @@ volumes:
   uploads:
 
 networks:
-  smartsupport-net:
+  orin-net:
     driver: bridge

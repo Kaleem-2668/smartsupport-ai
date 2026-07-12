@@ -1,4 +1,4 @@
-# Contributing to SmartSupport AI
+# Contributing to Orin
 
 Thank you for your interest in contributing! We welcome contributions from everyone.
 

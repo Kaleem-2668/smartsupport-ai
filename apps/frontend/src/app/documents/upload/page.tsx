@@ -5,9 +5,12 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState, type DragEvent, type ChangeEvent } from "react";
 
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { AppShell } from "@/components/AppShell";
+import { useToast } from "@/context/ToastContext";
 import { getKnowledgeBases, uploadDocument, type KnowledgeBase } from "@/lib/api";
 
 function UploadPageContent() {
+  const { showToast } = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
   const kbIdParam = searchParams.get("kb");
@@ -21,20 +24,19 @@ function UploadPageContent() {
   const [isLoadingKbs, setIsLoadingKbs] = useState(false);
 
   useEffect(() => {
+    async function loadKnowledgeBases() {
+      setIsLoadingKbs(true);
+      try {
+        const data = await getKnowledgeBases();
+        setKnowledgeBases(data);
+      } catch {
+        // Non-critical error, continue without knowledge bases
+      } finally {
+        setIsLoadingKbs(false);
+      }
+    }
     loadKnowledgeBases();
   }, []);
-
-  async function loadKnowledgeBases() {
-    setIsLoadingKbs(true);
-    try {
-      const data = await getKnowledgeBases();
-      setKnowledgeBases(data);
-    } catch {
-      // Non-critical error, continue without knowledge bases
-    } finally {
-      setIsLoadingKbs(false);
-    }
-  }
 
   const handleDragOver = (event: DragEvent) => {
     event.preventDefault();
@@ -93,6 +95,7 @@ function UploadPageContent() {
 
     try {
       await uploadDocument(file, selectedKbId || undefined);
+      showToast("Document uploaded successfully.", "success");
       router.push("/documents");
     } catch {
       setError("Failed to upload document. Please try again.");
@@ -103,8 +106,9 @@ function UploadPageContent() {
 
   return (
     <ProtectedRoute>
-      <main className="flex flex-1 flex-col items-center justify-center px-6">
-        <div className="w-full max-w-md">
+      <AppShell>
+        <main className="flex flex-1 flex-col items-center justify-center overflow-y-auto px-4 py-8 sm:px-6">
+          <div className="w-full max-w-md">
           <h1 className="mb-1 text-2xl font-semibold">Upload Document</h1>
           <p className="mb-6 text-sm text-black/60 dark:text-white/60">
             Upload PDF, TXT, MD, DOC, or DOCX files (max 10MB)
@@ -195,6 +199,7 @@ function UploadPageContent() {
           </p>
         </div>
       </main>
+      </AppShell>
     </ProtectedRoute>
   );
 }

@@ -5,6 +5,7 @@ from app.domain.exceptions import ConversationNotFoundError, LLMError
 from app.models.conversation import Conversation
 from app.models.message import Message, MessageRole
 from app.repositories.conversation_repository import ConversationRepository
+from app.repositories.document_repository import DocumentRepository
 from app.repositories.message_repository import MessageRepository
 from app.services.chroma_service import ChromaService
 from app.services.embedding_service import EmbeddingService
@@ -12,14 +13,54 @@ from app.services.llm_service import LLMService
 
 settings = get_settings()
 
-SYSTEM_PROMPT_TEMPLATE = """You are a customer support assistant for this business. Answer the \
-user's question using ONLY the context below, which was retrieved from the business's own \
-knowledge base. If the context does not contain enough information to answer confidently, say \
-that you don't have enough information rather than guessing.
+_CONTEXT_INSTRUCTIONS = """Answer the user's question using ONLY the context below, which was \
+retrieved from their own uploaded documents. Each excerpt is labeled with the document (and \
+page, where available) it came from. If the context does not contain enough information to \
+answer confidently, say so plainly rather than guessing.
+
+When the context includes excerpts from more than one document, synthesize across them rather \
+than treating each in isolation: connect related points, and explicitly note it if two sources \
+agree, disagree, or add complementary detail. When you state something specific, mention which \
+document it came from.
 
 Context:
 {context}
 """
+
+PERSONALITY_PROMPTS: dict[str, str] = {
+    "professional": (
+        "You are Orin, a precise and professional knowledge assistant. Answer clearly, "
+        "concisely, and factually, in the tone of a knowledgeable colleague. Avoid filler "
+        "and unnecessary hedging.\n\n" + _CONTEXT_INSTRUCTIONS
+    ),
+    "tutor": (
+        "You are Orin, acting as a patient tutor. Explain concepts step by step, define "
+        "any terms that might be unfamiliar, and where useful check the user's "
+        "understanding or suggest what to explore next. Prioritize clarity over brevity, "
+        "but stay on topic.\n\n" + _CONTEXT_INSTRUCTIONS
+    ),
+    "friendly": (
+        "You are Orin, a warm and approachable assistant. Answer in a conversational, "
+        "down-to-earth tone, like a helpful friend who happens to know the material well. "
+        "Stay accurate and avoid sounding stiff or overly formal.\n\n" + _CONTEXT_INSTRUCTIONS
+    ),
+    "playful": (
+        "You are Orin, an upbeat and playful assistant. Answer accurately, but with "
+        "energy, light humor, and the occasional emoji where it fits naturally. Keep it "
+        "fun without burying the actual answer.\n\n" + _CONTEXT_INSTRUCTIONS
+    ),
+    "roast": (
+        "You are Orin in Roast Mode: witty, sarcastic, and irreverent, like a friend who "
+        "teases you while still having your back. Feel free to gently roast the user's "
+        "question, the document's writing quality, or the situation in general — but keep "
+        "it good-natured, never mean-spirited, and never targeting personal "
+        "characteristics like appearance, identity, or ability. However you deliver it, "
+        "you must still answer the actual question correctly and completely — the roast is "
+        "garnish, not a substitute for the real answer.\n\n" + _CONTEXT_INSTRUCTIONS
+    ),
+}
+
+DEFAULT_PERSONALITY = "professional"
 
 NO_CONTEXT_PLACEHOLDER = "(No relevant documents were found in the knowledge base.)"
 
@@ -31,9 +72,11 @@ class ChatService:
         self,
         conversation_repository: ConversationRepository,
         message_repository: MessageRepository,
+        document_repository: DocumentRepository,
     ) -> None:
         self._conversations = conversation_repository
         self._messages = message_repository
+        self._documents = document_repository
         # Constructed lazily (only when a question is actually asked) so that read-only
         # endpoints — listing conversations/messages — don't require AI_API_KEY or a live
         # ChromaDB connection.
@@ -50,11 +93,17 @@ class ChatService:
             self._llm = LLMService()
 
     async def _get_or_create_conversation(
-        self, user_id: uuid.UUID, conversation_id: uuid.UUID | None, question: str
+        self,
+        user_id: uuid.UUID,
+        conversation_id: uuid.UUID | None,
+        question: str,
+        personality: str | None,
     ) -> Conversation:
         if conversation_id is None:
             title = question[:80]
-            return await self._conversations.create(user_id=user_id, title=title)
+            return await self._conversations.create(
+                user_id=user_id, title=title, personality=personality or DEFAULT_PERSONALITY
+            )
 
         conversation = await self._conversations.get_by_id(conversation_id)
         if conversation is None or conversation.user_id != user_id:
@@ -75,20 +124,49 @@ class ChatService:
 
         documents = results.get("documents") or [[]]
         metadatas = results.get("metadatas") or [[]]
+        distances = results.get("distances") or [[]]
         chunk_texts = documents[0] if documents else []
         chunk_metadatas = metadatas[0] if metadatas else []
+        chunk_distances = distances[0] if distances else []
 
         if not chunk_texts:
             return NO_CONTEXT_PLACEHOLDER, []
 
+        # Resolve document_id -> filename in a single batch query rather than one per source.
+        document_ids = {
+            metadata.get("document_id")
+            for metadata in chunk_metadatas
+            if metadata.get("document_id")
+        }
+        matched_documents = await self._documents.get_by_ids(
+            [uuid.UUID(doc_id) for doc_id in document_ids]
+        )
+        names_by_id = {str(doc.id): doc.original_filename for doc in matched_documents}
+
         context_parts = []
         sources = []
-        for text, metadata in zip(chunk_texts, chunk_metadatas, strict=False):
-            context_parts.append(text)
+        for i, (text, metadata) in enumerate(zip(chunk_texts, chunk_metadatas, strict=False)):
+            document_id = metadata.get("document_id")
+            document_name = names_by_id.get(document_id, "Unknown document")
+            page_number = metadata.get("page_number")
+            # Label each chunk with its source so the model can attribute claims to a
+            # specific document and reason across documents rather than treating the
+            # context as one undifferentiated blob.
+            label = f"[Source: {document_name}" + (f", page {page_number}]" if page_number else "]")
+            context_parts.append(f"{label}\n{text}")
+
+            # Cosine distance -> similarity confidence in [0, 1]; Chroma's cosine space
+            # returns distance = 1 - cosine_similarity, so similarity = 1 - distance.
+            confidence = None
+            if i < len(chunk_distances):
+                confidence = round(max(0.0, min(1.0, 1 - chunk_distances[i])), 3)
             sources.append(
                 {
-                    "document_id": metadata.get("document_id"),
+                    "document_id": document_id,
+                    "document_name": document_name,
                     "chunk_index": metadata.get("chunk_index"),
+                    "page_number": page_number,
+                    "confidence": confidence,
                     "snippet": text[:200],
                 }
             )
@@ -101,17 +179,23 @@ class ChatService:
         question: str,
         conversation_id: uuid.UUID | None,
         knowledge_base_id: uuid.UUID | None = None,
+        personality: str | None = None,
     ) -> tuple[uuid.UUID, Message]:
         """Answer a question, persisting both the user's message and the assistant's reply."""
         self._ensure_ai_services()
-        conversation = await self._get_or_create_conversation(user_id, conversation_id, question)
+        conversation = await self._get_or_create_conversation(
+            user_id, conversation_id, question, personality
+        )
 
         await self._messages.create(
             conversation_id=conversation.id, role=MessageRole.USER.value, content=question
         )
 
         context, sources = await self._retrieve_context(user_id, question, knowledge_base_id)
-        system_prompt = SYSTEM_PROMPT_TEMPLATE.format(context=context)
+        prompt_template = PERSONALITY_PROMPTS.get(
+            conversation.personality, PERSONALITY_PROMPTS[DEFAULT_PERSONALITY]
+        )
+        system_prompt = prompt_template.format(context=context)
 
         try:
             answer = await self._llm.generate_answer(system_prompt, question)
@@ -145,3 +229,22 @@ class ChatService:
         if conversation is None or conversation.user_id != user_id:
             raise ConversationNotFoundError(f"Conversation with ID {conversation_id} not found")
         await self._conversations.delete(conversation_id)
+
+    async def update_conversation(
+        self,
+        user_id: uuid.UUID,
+        conversation_id: uuid.UUID,
+        title: str | None = None,
+        personality: str | None = None,
+    ) -> Conversation:
+        conversation = await self._conversations.get_by_id(conversation_id)
+        if conversation is None or conversation.user_id != user_id:
+            raise ConversationNotFoundError(f"Conversation with ID {conversation_id} not found")
+
+        if title is not None:
+            conversation = await self._conversations.set_title(conversation_id, title)
+        if personality is not None:
+            conversation = await self._conversations.set_personality(conversation_id, personality)
+
+        assert conversation is not None  # existence already confirmed above
+        return conversation

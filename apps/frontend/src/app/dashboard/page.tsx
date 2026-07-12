@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { AppShell } from "@/components/AppShell";
 import { useAuth } from "@/context/AuthContext";
 import { getDashboardStats, type DashboardStats } from "@/lib/api/dashboard";
 
@@ -99,7 +100,7 @@ function DashboardContent() {
             Welcome back, {displayName}
           </h1>
           <p className="mt-1 text-sm text-black/50 dark:text-white/50">
-            Here&apos;s an overview of your SmartSupport AI platform.
+            Here&apos;s an overview of your Orin knowledge base.
           </p>
         </div>
 
@@ -275,7 +276,9 @@ function DashboardContent() {
 export default function DashboardPage() {
   return (
     <ProtectedRoute>
-      <DashboardContent />
+      <AppShell>
+        <DashboardContent />
+      </AppShell>
     </ProtectedRoute>
   );
 }

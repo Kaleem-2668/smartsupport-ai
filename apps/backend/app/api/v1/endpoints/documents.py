@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.v1.dependencies import get_current_user
 from app.db.session import get_db
 from app.domain.exceptions import DocumentNotFoundError, InvalidFileError, StorageError
-from app.domain.schemas.document import DocumentCreate, DocumentRead
+from app.domain.schemas.document import DocumentCreate, DocumentRead, RelatedDocument
 from app.models.document import Document
 from app.models.user import User
 from app.repositories.document_repository import DocumentRepository
@@ -76,6 +76,22 @@ async def get_document(
         if document.user_id != current_user.id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
         return document
+    except DocumentNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+@router.get("/{document_id}/related", response_model=list[RelatedDocument])
+async def get_related_documents(
+    document_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    document_service: DocumentService = Depends(get_document_service),
+) -> list[dict]:
+    """Find documents related to this one, based on embedding similarity."""
+    try:
+        document = await document_service.get_document(document_id)
+        if document.user_id != current_user.id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+        return await document_service.get_related_documents(document)
     except DocumentNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 

@@ -23,6 +23,12 @@ class DocumentRepository:
         )
         return list(result.scalars().all())
 
+    async def get_by_ids(self, document_ids: list[UUID]) -> list[Document]:
+        if not document_ids:
+            return []
+        result = await self._session.execute(select(Document).where(Document.id.in_(document_ids)))
+        return list(result.scalars().all())
+
     async def create(
         self,
         *,
@@ -78,6 +84,20 @@ class DocumentRepository:
         document.status = "ready"
         document.chunk_count = chunk_count
         document.processed_at = datetime.now()
+        await self._session.commit()
+        await self._session.refresh(document)
+        return document
+
+    async def set_intelligence(
+        self, document_id: UUID, summary: str | None, suggested_questions: list[str] | None
+    ) -> Document | None:
+        """Store the AI-generated summary and suggested questions for a document."""
+        result = await self._session.execute(select(Document).where(Document.id == document_id))
+        document = result.scalar_one_or_none()
+        if document is None:
+            return None
+        document.summary = summary
+        document.suggested_questions = suggested_questions
         await self._session.commit()
         await self._session.refresh(document)
         return document

@@ -1,6 +1,6 @@
 # Architecture Decisions
 
-This directory documents key architecture decisions (ADRs) for the SmartSupport AI Platform.
+This directory documents key architecture decisions (ADRs) for Orin.
 
 ## Active ADRs
 

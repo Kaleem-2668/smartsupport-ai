@@ -1,6 +1,6 @@
 <div align="center">
-  <h1>🤖 SmartSupport AI Platform</h1>
-  <p><strong>Turn your knowledge base into an AI-powered support agent</strong></p>
+  <h1>🤖 Orin</h1>
+  <p><strong>An AI-powered knowledge companion — chat with your own documents, grounded in cited sources</strong></p>
   <p>
     <a href="#features">Features</a> •
     <a href="#architecture">Architecture</a> •
@@ -28,12 +28,16 @@
 
 ## Overview
 
-SmartSupport AI Platform is a full-stack Retrieval-Augmented Generation (RAG) application that enables businesses to upload their documents and knowledge bases, allowing an AI assistant to answer customer questions accurately using only the provided context.
+Orin is a full-stack Retrieval-Augmented Generation (RAG) knowledge companion that enables users to upload their documents and knowledge bases, allowing an AI assistant to answer questions accurately using only the provided context.
 
 **Key capabilities:**
 - Upload PDF, TXT, MD, DOC, DOCX documents
 - Automatic text extraction, chunking, and embedding
-- AI-powered Q&A grounded in your documents with source citations
+- AI-powered Q&A grounded in your documents, with source citations (document name, page number, confidence)
+- 5 personality modes — Professional, Tutor, Friendly, Playful, and opt-in Roast Mode
+- Cross-document reasoning — synthesizes and attributes answers across multiple sources
+- Document summaries, suggested questions, and related-document recommendations
+- Conversation history — save, rename, search, and delete past chats
 - Organize documents into knowledge bases
 - Dashboard with usage analytics and recent activity
 - User authentication with JWT token rotation
@@ -45,11 +49,16 @@ SmartSupport AI Platform is a full-stack Retrieval-Augmented Generation (RAG) ap
 | 1 | Project Scaffolding — FastAPI + Next.js monorepo with Docker Compose | ✅ |
 | 2 | Authentication — JWT registration/login/refresh with token rotation | ✅ |
 | 3 | Document Upload — Drag-and-drop with MIME validation (PDF, TXT, MD, DOC, DOCX) | ✅ |
-| 4 | Embedding Pipeline — Text extraction → chunking → OpenAI embeddings → ChromaDB | ✅ |
+| 4 | Embedding Pipeline — Text extraction → chunking → Gemini embeddings → ChromaDB | ✅ |
 | 5 | RAG Chat — Context-grounded Q&A with conversation history | ✅ |
-| 6 | Knowledge Base Management — Organize documents into logical groups | ✅ |
-| 7 | Dashboard & Analytics — Stats cards, status breakdown, recent activity | ✅ |
-| 8 | Production Deployment — Docker, Nginx, health checks, environment validation | ✅ |
+| 6 | Source Citations — Document name, page number, and confidence score per answer | ✅ |
+| 7 | Personality Modes — Professional, Tutor, Friendly, Playful, opt-in Roast | ✅ |
+| 8 | Conversation History — Rename, search, and delete past conversations | ✅ |
+| 9 | Cross-Document Reasoning — Answers synthesize and attribute across multiple sources | ✅ |
+| 10 | Document Intelligence — AI summaries, suggested questions, related-document recommendations | ✅ |
+| 11 | Knowledge Base Management — Organize documents into logical groups | ✅ |
+| 12 | Dashboard & Analytics — Stats cards, status breakdown, recent activity | ✅ |
+| 13 | Production Deployment — Docker, Nginx, health checks, environment validation | ✅ |
 
 ## Architecture
 
@@ -68,7 +77,7 @@ SmartSupport AI Platform is a full-stack Retrieval-Augmented Generation (RAG) ap
 │                                       │              │
 │       ┌─────────────┐  ┌──────────┐   │              │
 │       │ LangChain   │  │ ChromaDB │   │              │
-│       │ (OpenAI)    │  │ (Vector) │   │              │
+│       │ (Gemini)    │  │ (Vector) │   │              │
 │       └─────────────┘  └──────────┘   │              │
 └───────────────────────────────────────┼──────────────┘
                                         │
@@ -88,7 +97,7 @@ SmartSupport AI Platform is a full-stack Retrieval-Augmented Generation (RAG) ap
 | **Migrations** | Alembic | Schema management |
 | **Database** | PostgreSQL 16 | Relational data |
 | **Vector DB** | ChromaDB | Document embeddings |
-| **AI** | LangChain + OpenAI | Embeddings & chat |
+| **AI** | LangChain + Gemini | Embeddings & chat |
 | **Auth** | JWT (access/refresh tokens), bcrypt | Authentication |
 | **Infrastructure** | Docker, Docker Compose, Nginx | Deployment |
 
@@ -112,7 +121,7 @@ Endpoints (HTTP) → Services (Business Logic) → Repositories (Data Access)
 - Docker & Docker Compose
 - Node.js 18+ (for local frontend dev)
 - Python 3.12+ (for local backend dev)
-- OpenAI API key
+- Gemini API key (free at [aistudio.google.com](https://aistudio.google.com/apikey))
 
 ### Local Development (Docker)
 
@@ -256,16 +265,17 @@ smartsupport-ai/
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `SECRET_KEY` | ✅ | — | JWT signing key (generate with `openssl rand -hex 32`) |
-| `AI_API_KEY` | ✅ | — | OpenAI API key |
+| `AI_API_KEY` | ✅ | — | Gemini API key |
+| `AI_PROVIDER` | — | `gemini` | AI provider: `gemini` or `openai` |
 | `POSTGRES_PASSWORD` | ✅ | — | Database password |
-| `POSTGRES_USER` | — | `smartsupport` | Database user |
-| `POSTGRES_DB` | — | `smartsupport` | Database name |
+| `POSTGRES_USER` | — | `orin` | Database user |
+| `POSTGRES_DB` | — | `orin` | Database name |
 | `POSTGRES_HOST` | — | `postgres` | Database host |
 | `POSTGRES_PORT` | — | `5432` | Database port |
 | `CHROMA_HOST` | — | `localhost` | ChromaDB host |
 | `CHROMA_PORT` | — | `8000` | ChromaDB port |
-| `AI_CHAT_MODEL` | — | `gpt-4o-mini` | Chat completion model |
-| `AI_MODEL` | — | `text-embedding-3-small` | Embedding model |
+| `AI_CHAT_MODEL` | — | `gemini-2.5-flash` | Chat completion model |
+| `AI_MODEL` | — | `models/gemini-embedding-001` | Embedding model |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | — | `15` | Access token TTL |
 | `REFRESH_TOKEN_EXPIRE_DAYS` | — | `7` | Refresh token TTL |
 | `CHUNK_SIZE` | — | `1000` | Document chunk size (chars) |
@@ -288,7 +298,7 @@ smartsupport-ai/
 # Ensure required env vars are set (will fail fast if missing)
 export SECRET_KEY="your-32-byte-hex-key"
 export POSTGRES_PASSWORD="your-db-password"
-export AI_API_KEY="your-openai-api-key"
+export AI_API_KEY="your-gemini-api-key"
 
 # Start production stack
 cd infra
@@ -339,16 +349,21 @@ See [SECURITY.md](SECURITY.md) for the full security policy.
 
 ## Testing
 
-The backend has **40+ unit tests** covering all features, running against an in-memory SQLite database:
+The backend has **84 unit tests** covering all features, running against an in-memory SQLite database:
 
 | Test File | Tests | Coverage |
 |-----------|-------|----------|
 | `test_auth.py` | 10 | Registration, login, token refresh, access control |
 | `test_health.py` | 1 | Health check endpoint |
-| `test_chat.py` | 13 | RAG pipeline, conversations, message history, isolation |
-| `test_documents.py` | 15 | Upload, CRUD, processing, cross-user isolation |
-| `test_knowledge_base.py` | 13 | CRUD, cross-user isolation |
+| `test_chat.py` | 26 | RAG pipeline, conversations, citations, personality modes, rename/search, isolation |
+| `test_documents.py` | 28 | Upload, CRUD, processing, summaries/suggested questions, related documents, cross-user isolation |
+| `test_knowledge_base.py` | 12 | CRUD, cross-user isolation |
 | `test_dashboard.py` | 7 | Stats, empty state, with data, isolation |
+
+Two tests in `test_documents.py` (`test_process_document_not_found`,
+`test_process_document_cannot_process_other_users`) require a **live ChromaDB** instance
+(the `docker compose` service) to pass — they'll fail in any environment without one
+running, since document processing constructs a real `ChromaService` client.
 
 ## License
 

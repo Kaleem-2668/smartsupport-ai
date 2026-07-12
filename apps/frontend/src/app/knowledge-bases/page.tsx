@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { AppShell } from "@/components/AppShell";
+import { useToast } from "@/context/ToastContext";
 import {
   createKnowledgeBase,
   deleteKnowledgeBase,
@@ -13,6 +15,7 @@ import {
 } from "@/lib/api/knowledge-bases";
 
 function KnowledgeBasesContent() {
+  const { showToast } = useToast();
   const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBase[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -23,29 +26,29 @@ function KnowledgeBasesContent() {
   const [newKbDescription, setNewKbDescription] = useState("");
 
   useEffect(() => {
+    async function loadKnowledgeBases() {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const data = await getKnowledgeBases();
+        setKnowledgeBases(data);
+      } catch {
+        setError("Failed to load knowledge bases. Please try again.");
+      } finally {
+        setIsLoading(false);
+      }
+    }
     loadKnowledgeBases();
   }, []);
-
-  async function loadKnowledgeBases() {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const data = await getKnowledgeBases();
-      setKnowledgeBases(data);
-    } catch {
-      setError("Failed to load knowledge bases. Please try again.");
-    } finally {
-      setIsLoading(false);
-    }
-  }
 
   async function handleDelete(knowledgeBaseId: string) {
     setDeletingId(knowledgeBaseId);
     try {
       await deleteKnowledgeBase(knowledgeBaseId);
       setKnowledgeBases((kbs) => kbs.filter((kb) => kb.id !== knowledgeBaseId));
+      showToast("Knowledge base deleted.", "success");
     } catch {
-      setError("Failed to delete knowledge base. Please try again.");
+      showToast("Failed to delete knowledge base. Please try again.", "error");
     } finally {
       setDeletingId(null);
     }
@@ -56,7 +59,6 @@ function KnowledgeBasesContent() {
     if (!newKbName.trim()) return;
 
     setIsCreating(true);
-    setError(null);
     try {
       const data: KnowledgeBaseCreate = {
         name: newKbName.trim(),
@@ -67,8 +69,9 @@ function KnowledgeBasesContent() {
       setNewKbName("");
       setNewKbDescription("");
       setShowCreateModal(false);
+      showToast("Knowledge base created.", "success");
     } catch {
-      setError("Failed to create knowledge base. Please try again.");
+      showToast("Failed to create knowledge base. Please try again.", "error");
     } finally {
       setIsCreating(false);
     }
@@ -83,9 +86,9 @@ function KnowledgeBasesContent() {
   }
 
   return (
-    <main className="flex flex-1 flex-col px-6 py-8">
+    <main className="flex flex-1 flex-col overflow-y-auto px-4 py-8 sm:px-6">
       <div className="mx-auto w-full max-w-4xl">
-        <div className="mb-6 flex items-center justify-between">
+        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-semibold">Knowledge Bases</h1>
             <p className="text-sm text-black/60 dark:text-white/60">
@@ -94,7 +97,7 @@ function KnowledgeBasesContent() {
           </div>
           <button
             onClick={() => setShowCreateModal(true)}
-            className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white transition hover:bg-black/80 dark:bg-white dark:text-black dark:hover:bg-white/80"
+            className="inline-flex items-center justify-center rounded-lg bg-black px-4 py-2 text-sm font-medium text-white transition hover:bg-black/80 dark:bg-white dark:text-black dark:hover:bg-white/80"
           >
             Create Knowledge Base
           </button>
@@ -107,8 +110,13 @@ function KnowledgeBasesContent() {
         )}
 
         {isLoading ? (
-          <div className="flex flex-1 items-center justify-center py-12">
-            <p className="text-sm text-black/50 dark:text-white/50">Loading knowledge bases…</p>
+          <div className="space-y-3">
+            {[...Array(3)].map((_, i) => (
+              <div
+                key={i}
+                className="h-20 animate-pulse rounded-lg border border-black/10 bg-black/5 dark:border-white/15 dark:bg-white/5"
+              />
+            ))}
           </div>
         ) : knowledgeBases.length === 0 ? (
           <div className="flex flex-1 flex-col items-center justify-center rounded-lg border border-dashed border-black/10 py-12 dark:border-white/15">
@@ -138,7 +146,7 @@ function KnowledgeBasesContent() {
             {knowledgeBases.map((kb) => (
               <div
                 key={kb.id}
-                className="flex items-center justify-between rounded-lg border border-black/10 bg-white p-4 dark:border-white/15 dark:bg-black"
+                className="flex flex-col gap-3 rounded-lg border border-black/10 bg-white p-4 dark:border-white/15 dark:bg-black sm:flex-row sm:items-center sm:justify-between"
               >
                 <div className="flex-1">
                   <h3 className="font-medium">{kb.name}</h3>
@@ -170,7 +178,7 @@ function KnowledgeBasesContent() {
         )}
 
         {showCreateModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 dark:bg-white/50">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 dark:bg-white/50">
             <div className="w-full max-w-md rounded-lg border border-black/10 bg-white p-6 shadow-xl dark:border-white/15 dark:bg-black">
               <h2 className="mb-4 text-lg font-semibold">Create Knowledge Base</h2>
               <form onSubmit={handleCreate}>
@@ -230,7 +238,9 @@ function KnowledgeBasesContent() {
 export default function KnowledgeBasesPage() {
   return (
     <ProtectedRoute>
-      <KnowledgeBasesContent />
+      <AppShell>
+        <KnowledgeBasesContent />
+      </AppShell>
     </ProtectedRoute>
   );
 }

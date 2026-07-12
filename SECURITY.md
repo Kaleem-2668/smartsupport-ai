@@ -12,7 +12,7 @@
 We take security seriously. If you discover a security vulnerability, please:
 
 1. **Do not** open a public issue — use private disclosure
-2. Email the maintainers at security@smartsupport.ai
+2. Email the maintainers at security@orin.ai
 3. Include a description of the vulnerability and steps to reproduce
 
 We will acknowledge receipt within 48 hours and work on a fix promptly.

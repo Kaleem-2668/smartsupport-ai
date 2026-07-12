@@ -1,4 +1,4 @@
-# Simple Deployment Guide - SmartSupport AI Platform
+# Simple Deployment Guide - Orin
 
 **Quick deployment using Railway and Vercel with built-in services.**
 

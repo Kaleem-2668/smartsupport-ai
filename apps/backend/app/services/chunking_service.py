@@ -31,3 +31,17 @@ class ChunkingService:
         for i, chunk in enumerate(chunks):
             chunk_data.append({"index": i, "content": chunk})
         return chunk_data
+
+    def chunk_pages(self, pages: list[dict]) -> list[dict]:
+        """Chunk a list of {"page_number", "text"} entries, keeping each chunk within a
+        single page so citations can report an accurate page number. Returns chunks with
+        a global sequential index plus the originating page_number."""
+        chunk_data = []
+        index = 0
+        for page in pages:
+            for piece in self.chunk_text(page["text"]):
+                chunk_data.append(
+                    {"index": index, "content": piece, "page_number": page["page_number"]}
+                )
+                index += 1
+        return chunk_data

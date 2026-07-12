@@ -30,7 +30,7 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         <h1 className="mb-1 text-2xl font-semibold">Welcome back</h1>
         <p className="mb-6 text-sm text-black/60 dark:text-white/60">
-          Log in to your SmartSupport AI account.
+          Log in to your Orin account.
         </p>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">

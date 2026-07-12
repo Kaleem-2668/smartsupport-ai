@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     app_env: str = "development"
-    app_name: str = "SmartSupport AI Platform"
+    app_name: str = "Orin"
     api_v1_prefix: str = "/api/v1"
     debug: bool = False
 
@@ -19,24 +19,24 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 15
     refresh_token_expire_days: int = 7
 
-    postgres_user: str = "smartsupport"
-    postgres_password: str = "smartsupport"
-    postgres_db: str = "smartsupport"
+    postgres_user: str = "orin"
+    postgres_password: str = "orin"
+    postgres_db: str = "orin"
     postgres_host: str = "localhost"
     postgres_port: int = 5432
 
     chroma_host: str = "localhost"
     chroma_port: int = 8000
 
-    ai_provider: str = "openai"
+    ai_provider: str = "gemini"
     ai_api_key: str | None = None
-    ai_model: str = "text-embedding-3-small"
-    ai_embedding_dimensions: int = 1536
+    ai_model: str = "models/gemini-embedding-001"
+    ai_embedding_dimensions: int = 3072
 
     # Chat completion settings
-    ai_chat_model: str = "gpt-4o-mini"
+    ai_chat_model: str = "gemini-2.5-flash"
     ai_chat_temperature: float = 0.2
-    chat_retrieval_top_k: int = 4
+    chat_retrieval_top_k: int = 6
 
     # Document storage settings
     upload_dir: str = "uploads"

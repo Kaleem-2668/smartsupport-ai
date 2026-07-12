@@ -1,5 +1,0 @@
-[33m7d7690e[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m)[m fix: resolve deployment and configuration issues
-[33m010434d[m fix: resolve deployment and configuration issues
-[33m8f03d4e[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m Merge pull request #3 from Kaleem-2668/fix/runtime-bugs-and-missing-files
-[33m1a8c29a[m[33m ([m[1;31morigin/fix/runtime-bugs-and-missing-files[m[33m)[m Fix async/await bugs, missing frontend API modules, and gitignore lib/ bug
-[33m3773b7c[m chore: clean deployment setup - Dockerfile and railway.json for Railway.app

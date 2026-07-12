@@ -27,8 +27,10 @@ class ConversationRepository:
         )
         return list(result.scalars().all())
 
-    async def create(self, *, user_id: UUID, title: str | None = None) -> Conversation:
-        conversation = Conversation(user_id=user_id, title=title)
+    async def create(
+        self, *, user_id: UUID, title: str | None = None, personality: str = "professional"
+    ) -> Conversation:
+        conversation = Conversation(user_id=user_id, title=title, personality=personality)
         self._session.add(conversation)
         await self._session.commit()
         await self._session.refresh(conversation)
@@ -47,6 +49,15 @@ class ConversationRepository:
         if conversation is None:
             return None
         conversation.title = title
+        await self._session.commit()
+        await self._session.refresh(conversation)
+        return conversation
+
+    async def set_personality(self, conversation_id: UUID, personality: str) -> Conversation | None:
+        conversation = await self.get_by_id(conversation_id)
+        if conversation is None:
+            return None
+        conversation.personality = personality
         await self._session.commit()
         await self._session.refresh(conversation)
         return conversation

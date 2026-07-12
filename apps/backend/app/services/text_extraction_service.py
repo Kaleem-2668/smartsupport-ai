@@ -6,6 +6,37 @@ from app.domain.exceptions import InvalidFileError
 class TextExtractionService:
     """Service for extracting text from various document formats."""
 
+    async def extract_pages(self, file_path: str, mime_type: str) -> list[dict]:
+        """Extract text as a list of {"page_number": int | None, "text": str} entries.
+
+        PDFs return one entry per page (1-indexed), since page boundaries are meaningful
+        for citations. Other formats have no native page concept, so they return a single
+        entry with page_number=None.
+        """
+        path = Path(file_path)
+
+        if not path.exists():
+            raise InvalidFileError(f"File not found: {file_path}")
+
+        if mime_type == "application/pdf":
+            return await self._extract_pages_from_pdf(path)
+
+        text = await self.extract_text(file_path, mime_type)
+        return [{"page_number": None, "text": text}]
+
+    async def _extract_pages_from_pdf(self, path: Path) -> list[dict]:
+        """Extract text from a PDF, one entry per page."""
+        try:
+            from pypdf import PdfReader
+
+            reader = PdfReader(path)
+            pages = []
+            for i, page in enumerate(reader.pages):
+                pages.append({"page_number": i + 1, "text": page.extract_text()})
+            return pages
+        except Exception as exc:
+            raise InvalidFileError(f"Failed to extract text from PDF: {exc}") from exc
+
     async def extract_text(self, file_path: str, mime_type: str) -> str:
         """Extract text from a file based on its MIME type."""
         path = Path(file_path)

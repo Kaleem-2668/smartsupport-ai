@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from enum import Enum
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Uuid
+from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, Text, Uuid
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
 
@@ -34,6 +34,10 @@ class Document(Base):
     status: Mapped[str] = mapped_column(String(50), default=DocumentStatus.UPLOADING, nullable=False)
     error_message: Mapped[str | None] = mapped_column(String(512), nullable=True)
     chunk_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # AI-generated at processing time; both null until then, and left null (not retried)
+    # if generation fails, since they're an enrichment rather than critical-path data.
+    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    suggested_questions: Mapped[list | None] = mapped_column(JSON, nullable=True)
     processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

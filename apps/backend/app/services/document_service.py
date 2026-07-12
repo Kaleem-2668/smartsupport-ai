@@ -104,10 +104,54 @@ class DocumentService:
 
             chroma = ChromaService()
             try:
-                chroma.delete_document_embeddings(document.user_id, document_id)
+                chroma.delete_document_embeddings(
+                    document.user_id, document_id, document.knowledge_base_id
+                )
             except Exception:
                 # Log but don't fail the deletion if embedding cleanup fails
                 pass
 
         await self.delete_file(document.file_path)
         await self._documents.delete(document_id)
+
+    async def get_related_documents(self, document: Document) -> list[dict]:
+        """Find documents related to the given one, based on embedding similarity.
+        Returns an empty list if the document hasn't been processed yet (no embeddings
+        to compare against)."""
+        if document.status != DocumentStatus.READY or not document.chunk_count:
+            return []
+
+        from app.services.chroma_service import ChromaService
+
+        chroma = ChromaService()
+        try:
+            related = chroma.find_related_documents(
+                document.user_id, document.id, document.knowledge_base_id
+            )
+        except Exception:
+            # Related documents are a nice-to-have, not critical — degrade gracefully
+            # rather than surfacing a 500 for a widget that's secondary to the page.
+            return []
+
+        if not related:
+            return []
+
+        other_ids = [uuid.UUID(item["document_id"]) for item in related]
+        matched_documents = await self._documents.get_by_ids(other_ids)
+        names_by_id = {str(doc.id): doc.original_filename for doc in matched_documents}
+
+        results = []
+        for item in related:
+            filename = names_by_id.get(item["document_id"])
+            if filename is None:
+                # Embedding exists for a document that's since been deleted; skip it
+                # rather than surfacing a broken reference.
+                continue
+            results.append(
+                {
+                    "document_id": item["document_id"],
+                    "filename": filename,
+                    "similarity": item["similarity"],
+                }
+            )
+        return results

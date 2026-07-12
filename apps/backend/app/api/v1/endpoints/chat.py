@@ -6,11 +6,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.v1.dependencies import get_current_user
 from app.db.session import get_db
 from app.domain.exceptions import ConversationNotFoundError, LLMError
-from app.domain.schemas.chat import ChatRequest, ChatResponse, ConversationRead, MessageRead
+from app.domain.schemas.chat import (
+    ChatRequest,
+    ChatResponse,
+    ConversationRead,
+    ConversationUpdate,
+    MessageRead,
+)
 from app.models.conversation import Conversation
 from app.models.message import Message
 from app.models.user import User
 from app.repositories.conversation_repository import ConversationRepository
+from app.repositories.document_repository import DocumentRepository
 from app.repositories.message_repository import MessageRepository
 from app.services.chat_service import ChatService
 
@@ -18,7 +25,7 @@ router = APIRouter(tags=["chat"])
 
 
 def get_chat_service(db: AsyncSession = Depends(get_db)) -> ChatService:
-    return ChatService(ConversationRepository(db), MessageRepository(db))
+    return ChatService(ConversationRepository(db), MessageRepository(db), DocumentRepository(db))
 
 
 @router.post("/chat", response_model=ChatResponse)
@@ -35,6 +42,7 @@ async def ask_question(
             question=payload.question,
             conversation_id=payload.conversation_id,
             knowledge_base_id=payload.knowledge_base_id,
+            personality=payload.personality,
         )
         return ChatResponse(
             conversation_id=conversation_id,
@@ -64,6 +72,30 @@ async def list_conversation_messages(
     """List all messages in a conversation, oldest first."""
     try:
         return await chat_service.get_conversation_messages(current_user.id, conversation_id)
+    except ConversationNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+@router.patch("/conversations/{conversation_id}", response_model=ConversationRead)
+async def update_conversation(
+    conversation_id: uuid.UUID,
+    payload: ConversationUpdate,
+    current_user: User = Depends(get_current_user),
+    chat_service: ChatService = Depends(get_chat_service),
+) -> Conversation:
+    """Update a conversation's title and/or personality. Provide at least one field."""
+    if payload.title is None and payload.personality is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Provide at least one of title or personality to update.",
+        )
+    try:
+        return await chat_service.update_conversation(
+            current_user.id,
+            conversation_id,
+            title=payload.title,
+            personality=payload.personality,
+        )
     except ConversationNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
