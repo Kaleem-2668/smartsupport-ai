@@ -1,6 +1,8 @@
+import json
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.dependencies import get_current_user
@@ -52,6 +54,37 @@ async def ask_question(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except LLMError as exc:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+
+
+@router.post("/chat/stream")
+async def ask_question_stream(
+    payload: ChatRequest,
+    current_user: User = Depends(get_current_user),
+    chat_service: ChatService = Depends(get_chat_service),
+) -> StreamingResponse:
+    """Same as POST /chat, but streams the answer as Server-Sent Events instead of
+    waiting for the full response. Each event is `data: <json>\\n\\n` with one of:
+    {"type": "start", "conversation_id": "..."}, {"type": "token", "content": "..."},
+    {"type": "done", "message": {...}}, or {"type": "error", "detail": "..."}."""
+
+    async def event_stream():
+        try:
+            async for event in chat_service.ask_stream(
+                user_id=current_user.id,
+                question=payload.question,
+                conversation_id=payload.conversation_id,
+                knowledge_base_id=payload.knowledge_base_id,
+                personality=payload.personality,
+            ):
+                yield f"data: {json.dumps(event)}\n\n"
+        except ConversationNotFoundError as exc:
+            yield f"data: {json.dumps({'type': 'error', 'detail': str(exc)})}\n\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @router.get("/conversations", response_model=list[ConversationRead])

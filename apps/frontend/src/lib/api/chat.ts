@@ -1,4 +1,5 @@
-import { apiClient } from "./client";
+import { API_URL, apiClient } from "./client";
+import { getStoredTokens } from "./tokenStorage";
 
 export type Personality = "professional" | "tutor" | "friendly" | "playful" | "roast";
 
@@ -91,6 +92,102 @@ export async function askQuestion(
     personality: conversationId ? undefined : personality ?? undefined,
   });
   return data;
+}
+
+export interface StreamCallbacks {
+  onStart?: (conversationId: string) => void;
+  onToken: (token: string) => void;
+  onDone: (message: Message) => void;
+  onError: (detail: string) => void;
+  onAbort?: () => void;
+}
+
+export async function askQuestionStream(
+  question: string,
+  conversationId: string | null | undefined,
+  knowledgeBaseId: string | null | undefined,
+  personality: Personality | null | undefined,
+  callbacks: StreamCallbacks,
+  signal?: AbortSignal
+): Promise<void> {
+  const { accessToken } = getStoredTokens();
+
+  let response: Response;
+  try {
+    response = await fetch(`${API_URL}/chat/stream`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      },
+      body: JSON.stringify({
+        question,
+        conversation_id: conversationId ?? undefined,
+        knowledge_base_id: knowledgeBaseId ?? undefined,
+        // Only meaningful when starting a new conversation; the backend ignores it
+        // for an existing one.
+        personality: conversationId ? undefined : personality ?? undefined,
+      }),
+      signal,
+    });
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "AbortError") {
+      callbacks.onAbort?.();
+      return;
+    }
+    callbacks.onError("Network error — couldn't reach the server.");
+    return;
+  }
+
+  if (!response.ok || !response.body) {
+    callbacks.onError(`Request failed (${response.status}).`);
+    return;
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      // SSE events are separated by a blank line; the trailing piece may be a partial
+      // event still being streamed in, so keep it in the buffer for the next read.
+      const parts = buffer.split("\n\n");
+      buffer = parts.pop() ?? "";
+
+      for (const part of parts) {
+        const dataLine = part.split("\n").find((line) => line.startsWith("data: "));
+        if (!dataLine) continue;
+
+        let event: { type: string; conversation_id?: string; content?: string; message?: Message; detail?: string };
+        try {
+          event = JSON.parse(dataLine.slice("data: ".length));
+        } catch {
+          continue;
+        }
+
+        if (event.type === "start" && event.conversation_id) {
+          callbacks.onStart?.(event.conversation_id);
+        } else if (event.type === "token" && event.content !== undefined) {
+          callbacks.onToken(event.content);
+        } else if (event.type === "done" && event.message) {
+          callbacks.onDone(event.message);
+        } else if (event.type === "error") {
+          callbacks.onError(event.detail || "Something went wrong.");
+        }
+      }
+    }
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "AbortError") {
+      callbacks.onAbort?.();
+    } else {
+      callbacks.onError("Connection lost while streaming the response.");
+    }
+  }
 }
 
 export async function getConversations(): Promise<Conversation[]> {

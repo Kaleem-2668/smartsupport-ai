@@ -19,6 +19,13 @@ class ConversationRepository:
         )
         return result.scalar_one_or_none()
 
+    async def list_recent(self, limit: int = 50) -> list[Conversation]:
+        """Admin-facing: most recently active conversations across ALL users."""
+        result = await self._session.execute(
+            select(Conversation).order_by(Conversation.updated_at.desc()).limit(limit)
+        )
+        return list(result.scalars().all())
+
     async def get_by_user(self, user_id: UUID) -> list[Conversation]:
         result = await self._session.execute(
             select(Conversation)

@@ -3,6 +3,7 @@ import axios, { type AxiosError, type AxiosInstance, type InternalAxiosRequestCo
 import { clearStoredTokens, getStoredTokens, setStoredTokens } from "./tokenStorage";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
+export { API_URL };
 
 // Requests to these paths must never trigger the refresh-and-retry flow below —
 // a 401 there means "wrong credentials" or "bad token", not "token expired".

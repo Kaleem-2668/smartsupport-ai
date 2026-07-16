@@ -12,6 +12,10 @@ class Settings(BaseSettings):
 
     app_env: str = "development"
     app_name: str = "Orin"
+    # Whoever registers with this email is automatically made an admin. Set this in your
+    # .env before your own first registration. Further admins are then promoted through
+    # the admin UI itself, not this setting.
+    first_admin_email: str | None = None
     api_v1_prefix: str = "/api/v1"
     debug: bool = False
 
@@ -37,6 +41,10 @@ class Settings(BaseSettings):
     ai_chat_model: str = "gemini-2.5-flash"
     ai_chat_temperature: float = 0.2
     chat_retrieval_top_k: int = 6
+    # Below this cosine similarity, a retrieved chunk is treated as irrelevant noise
+    # rather than real context — this is what stops "what is 2+2?" from getting
+    # document citations bolted onto it just because *something* came back from Chroma.
+    chat_relevance_threshold: float = 0.35
 
     # Document storage settings
     upload_dir: str = "uploads"

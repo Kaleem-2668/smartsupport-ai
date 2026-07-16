@@ -13,15 +13,21 @@ from app.services.llm_service import LLMService
 
 settings = get_settings()
 
-_CONTEXT_INSTRUCTIONS = """Answer the user's question using ONLY the context below, which was \
-retrieved from their own uploaded documents. Each excerpt is labeled with the document (and \
-page, where available) it came from. If the context does not contain enough information to \
-answer confidently, say so plainly rather than guessing.
+_CONTEXT_INSTRUCTIONS = """You may be given context excerpts retrieved from the user's own \
+uploaded documents below. Use them to ground and cite any claims about the user's documents, \
+and mention which document (and page, where available) a specific claim came from.
+
+This restriction only applies to questions ABOUT the user's documents: if the user is clearly \
+asking something the documents should cover and the context below doesn't have it, say so \
+plainly rather than guessing. For everything else — general knowledge, quick facts, small talk, \
+creative requests, or questions about yourself — answer normally and helpfully using your own \
+knowledge. Don't refuse or deflect just because the answer isn't in the retrieved context; that \
+restriction is about not fabricating facts regarding the user's documents, not about limiting \
+what you're willing to talk about.
 
 When the context includes excerpts from more than one document, synthesize across them rather \
 than treating each in isolation: connect related points, and explicitly note it if two sources \
-agree, disagree, or add complementary detail. When you state something specific, mention which \
-document it came from.
+agree, disagree, or add complementary detail.
 
 Context:
 {context}
@@ -132,11 +138,27 @@ class ChatService:
         if not chunk_texts:
             return NO_CONTEXT_PLACEHOLDER, []
 
+        # Compute a confidence per chunk up front, then drop anything below the
+        # relevance threshold — this is what keeps citations off questions that
+        # aren't actually about the user's documents (e.g. "what is 2+2?" might still
+        # return *something* from a vector search, but not anything relevant).
+        # Chunks with no distance data at all (confidence=None) are kept, since we
+        # have no basis to judge them irrelevant.
+        relevant = []
+        for i, (text, metadata) in enumerate(zip(chunk_texts, chunk_metadatas, strict=False)):
+            confidence = None
+            if i < len(chunk_distances):
+                confidence = round(max(0.0, min(1.0, 1 - chunk_distances[i])), 3)
+            if confidence is not None and confidence < settings.chat_relevance_threshold:
+                continue
+            relevant.append((text, metadata, confidence))
+
+        if not relevant:
+            return NO_CONTEXT_PLACEHOLDER, []
+
         # Resolve document_id -> filename in a single batch query rather than one per source.
         document_ids = {
-            metadata.get("document_id")
-            for metadata in chunk_metadatas
-            if metadata.get("document_id")
+            metadata.get("document_id") for _, metadata, _ in relevant if metadata.get("document_id")
         }
         matched_documents = await self._documents.get_by_ids(
             [uuid.UUID(doc_id) for doc_id in document_ids]
@@ -145,7 +167,7 @@ class ChatService:
 
         context_parts = []
         sources = []
-        for i, (text, metadata) in enumerate(zip(chunk_texts, chunk_metadatas, strict=False)):
+        for text, metadata, confidence in relevant:
             document_id = metadata.get("document_id")
             document_name = names_by_id.get(document_id, "Unknown document")
             page_number = metadata.get("page_number")
@@ -154,12 +176,6 @@ class ChatService:
             # context as one undifferentiated blob.
             label = f"[Source: {document_name}" + (f", page {page_number}]" if page_number else "]")
             context_parts.append(f"{label}\n{text}")
-
-            # Cosine distance -> similarity confidence in [0, 1]; Chroma's cosine space
-            # returns distance = 1 - cosine_similarity, so similarity = 1 - distance.
-            confidence = None
-            if i < len(chunk_distances):
-                confidence = round(max(0.0, min(1.0, 1 - chunk_distances[i])), 3)
             sources.append(
                 {
                     "document_id": document_id,
@@ -212,6 +228,70 @@ class ChatService:
         await self._conversations.touch(conversation.id)
 
         return conversation.id, assistant_message
+
+    async def ask_stream(
+        self,
+        user_id: uuid.UUID,
+        question: str,
+        conversation_id: uuid.UUID | None,
+        knowledge_base_id: uuid.UUID | None = None,
+        personality: str | None = None,
+    ):
+        """Same pipeline as ask(), but yields incremental events as the answer is
+        generated, so the frontend can render tokens as they arrive rather than waiting
+        for the full response:
+          {"type": "start", "conversation_id": "..."}
+          {"type": "token", "content": "..."}       (repeated)
+          {"type": "done", "message": {...}}          (final, full persisted message)
+          {"type": "error", "detail": "..."}          (in place of "done", on failure)
+        The user's message and the final assistant message are persisted exactly like
+        ask() — streaming only changes how the answer is delivered, not what's stored.
+        """
+        self._ensure_ai_services()
+        conversation = await self._get_or_create_conversation(
+            user_id, conversation_id, question, personality
+        )
+
+        await self._messages.create(
+            conversation_id=conversation.id, role=MessageRole.USER.value, content=question
+        )
+
+        yield {"type": "start", "conversation_id": str(conversation.id)}
+
+        context, sources = await self._retrieve_context(user_id, question, knowledge_base_id)
+        prompt_template = PERSONALITY_PROMPTS.get(
+            conversation.personality, PERSONALITY_PROMPTS[DEFAULT_PERSONALITY]
+        )
+        system_prompt = prompt_template.format(context=context)
+
+        full_answer = ""
+        try:
+            async for chunk in self._llm.generate_answer_stream(system_prompt, question):
+                full_answer += chunk
+                yield {"type": "token", "content": chunk}
+        except RuntimeError as exc:
+            yield {"type": "error", "detail": str(exc)}
+            return
+
+        assistant_message = await self._messages.create(
+            conversation_id=conversation.id,
+            role=MessageRole.ASSISTANT.value,
+            content=full_answer,
+            sources=sources,
+        )
+        await self._conversations.touch(conversation.id)
+
+        yield {
+            "type": "done",
+            "message": {
+                "id": str(assistant_message.id),
+                "conversation_id": str(conversation.id),
+                "role": assistant_message.role,
+                "content": full_answer,
+                "sources": sources,
+                "created_at": assistant_message.created_at.isoformat(),
+            },
+        }
 
     async def get_user_conversations(self, user_id: uuid.UUID) -> list[Conversation]:
         return await self._conversations.get_by_user(user_id)

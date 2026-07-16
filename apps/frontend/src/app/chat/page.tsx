@@ -7,7 +7,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AppShell } from "@/components/AppShell";
 import { useToast } from "@/context/ToastContext";
 import {
-  askQuestion,
+  askQuestionStream,
   deleteConversation,
   getConversationMessages,
   getConversations,
@@ -105,7 +105,7 @@ function PersonalitySelector({
             title={option.description}
             className={`rounded-full border px-2.5 py-1 text-xs font-medium transition disabled:opacity-50 ${
               value === option.key
-                ? "border-black bg-black text-white dark:border-white dark:bg-white dark:text-black"
+                ? "border-accent bg-accent text-accent-foreground dark:border-accent dark:bg-accent dark:text-accent-foreground"
                 : "border-black/10 hover:bg-black/5 dark:border-white/15 dark:hover:bg-white/10"
             }`}
           >
@@ -144,6 +144,39 @@ function PersonalitySelector({
   );
 }
 
+function FormattedMessageContent({ content }: { content: string }) {
+  // Split on ``` fences so code blocks get monospace/background treatment without
+  // pulling in a full markdown renderer for what's otherwise plain text.
+  const parts = content.split(/(```[\s\S]*?```)/g);
+
+  return (
+    <>
+      {parts.map((part, i) => {
+        if (part.startsWith("```") && part.endsWith("```")) {
+          const inner = part.slice(3, -3);
+          const firstNewline = inner.indexOf("\n");
+          const language = firstNewline === -1 ? "" : inner.slice(0, firstNewline).trim();
+          const code = firstNewline === -1 ? inner : inner.slice(firstNewline + 1);
+          return (
+            <pre
+              key={i}
+              className="my-2 overflow-x-auto rounded-lg bg-black/90 p-3 text-xs text-white dark:bg-black"
+            >
+              {language && <div className="mb-1 text-[10px] uppercase tracking-wide text-white/40">{language}</div>}
+              <code className="font-mono">{code.replace(/\n$/, "")}</code>
+            </pre>
+          );
+        }
+        return part ? (
+          <p key={i} className="whitespace-pre-wrap">
+            {part}
+          </p>
+        ) : null;
+      })}
+    </>
+  );
+}
+
 function ChatContent() {
   const { showToast } = useToast();
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -152,6 +185,9 @@ function ChatContent() {
   const searchParams = useSearchParams();
   const [input, setInput] = useState(() => searchParams.get("q") || "");
   const [isSending, setIsSending] = useState(false);
+  const [streamingText, setStreamingText] = useState<string | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const [isLoadingConversations, setIsLoadingConversations] = useState(true);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -279,14 +315,16 @@ function ChatContent() {
     }
   }
 
-  async function handleSend() {
-    const question = input.trim();
+  async function handleSend(overrideQuestion?: string) {
+    const question = (overrideQuestion ?? input).trim();
     if (!question || isSending) return;
 
-    setInput("");
+    if (!overrideQuestion) setInput("");
     setError(null);
     setIsSending(true);
+    setStreamingText("");
 
+    const isNewConversation = activeConversationId === null;
     const optimisticUserMessage: Message = {
       id: `pending-${Date.now()}`,
       conversation_id: activeConversationId ?? "",
@@ -297,29 +335,92 @@ function ChatContent() {
     };
     setMessages((prev) => [...prev, optimisticUserMessage]);
 
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    let accumulated = "";
+
+    await askQuestionStream(
+      question,
+      activeConversationId,
+      selectedKbId || undefined,
+      newConversationPersonality,
+      {
+        onStart: (conversationId) => {
+          if (isNewConversation) {
+            setActiveConversationId(conversationId);
+          }
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === optimisticUserMessage.id ? { ...m, conversation_id: conversationId } : m
+            )
+          );
+        },
+        onToken: (token) => {
+          accumulated += token;
+          setStreamingText(accumulated);
+        },
+        onDone: async (message) => {
+          setMessages((prev) => [...prev, message]);
+          setStreamingText(null);
+          setIsSending(false);
+          abortControllerRef.current = null;
+          if (isNewConversation) {
+            await loadConversations();
+          }
+        },
+        onError: (detail) => {
+          setError(detail || "Failed to get a response. Please try again.");
+          setMessages((prev) => prev.filter((m) => m.id !== optimisticUserMessage.id));
+          setStreamingText(null);
+          setIsSending(false);
+          setInput(question);
+          abortControllerRef.current = null;
+        },
+        onAbort: () => {
+          // Keep whatever was generated so far as the final rendered message. Note:
+          // the backend also stops generating when the connection drops, so this
+          // partial answer only exists in this browser session — it isn't persisted,
+          // and won't be there if you reload the conversation.
+          if (accumulated) {
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: `aborted-${Date.now()}`,
+                conversation_id: activeConversationId ?? "",
+                role: "assistant",
+                content: accumulated + "\n\n_(stopped)_",
+                sources: null,
+                created_at: new Date().toISOString(),
+              },
+            ]);
+          }
+          setStreamingText(null);
+          setIsSending(false);
+          abortControllerRef.current = null;
+        },
+      },
+      controller.signal
+    );
+  }
+
+  function handleStop() {
+    abortControllerRef.current?.abort();
+  }
+
+  function handleRegenerate() {
+    const lastUserMessage = [...messages].reverse().find((m) => m.role === "user");
+    if (lastUserMessage) {
+      handleSend(lastUserMessage.content);
+    }
+  }
+
+  async function handleCopy(message: Message) {
     try {
-      const response = await askQuestion(
-        question,
-        activeConversationId,
-        selectedKbId || undefined,
-        newConversationPersonality
-      );
-      const isNewConversation = activeConversationId === null;
-      setActiveConversationId(response.conversation_id);
-      setMessages((prev) => [
-        ...prev.filter((m) => m.id !== optimisticUserMessage.id),
-        { ...optimisticUserMessage, conversation_id: response.conversation_id },
-        response.message,
-      ]);
-      if (isNewConversation) {
-        await loadConversations();
-      }
+      await navigator.clipboard.writeText(message.content);
+      setCopiedMessageId(message.id);
+      setTimeout(() => setCopiedMessageId((current) => (current === message.id ? null : current)), 1500);
     } catch {
-      setError("Failed to get a response. Please try again.");
-      setMessages((prev) => prev.filter((m) => m.id !== optimisticUserMessage.id));
-      setInput(question);
-    } finally {
-      setIsSending(false);
+      showToast("Couldn't copy — your browser may have blocked clipboard access.", "error");
     }
   }
 
@@ -339,6 +440,11 @@ function ChatContent() {
   );
 
   const activeConversation = conversations.find((c) => c.id === activeConversationId) || null;
+  const lastAssistantMessage = [...messages].reverse().find((m) => m.role === "assistant");
+
+  function formatTimestamp(iso: string): string {
+    return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  }
 
   return (
     <main className="relative flex flex-1 overflow-hidden">
@@ -360,7 +466,7 @@ function ChatContent() {
         <div className="p-4">
           <button
             onClick={handleNewConversation}
-            className="w-full rounded-lg bg-black px-4 py-2 text-sm font-medium text-white transition hover:bg-black/80 dark:bg-white dark:text-black dark:hover:bg-white/80"
+            className="w-full rounded-lg bg-accent px-4 py-2 text-sm font-medium text-accent-foreground transition hover:bg-accent/90 dark:bg-accent dark:text-accent-foreground dark:hover:bg-accent/90"
           >
             New chat
           </button>
@@ -518,24 +624,56 @@ function ChatContent() {
                   className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
                 >
                   <div
-                    className={`max-w-[80%] rounded-lg px-4 py-2 text-sm ${
+                    className={`group max-w-[80%] rounded-lg px-4 py-2 text-sm ${
                       message.role === "user"
-                        ? "bg-black text-white dark:bg-white dark:text-black"
+                        ? "bg-accent text-accent-foreground dark:bg-accent dark:text-accent-foreground"
                         : "border border-black/10 dark:border-white/15"
                     }`}
                   >
-                    <p className="whitespace-pre-wrap">{message.content}</p>
+                    <FormattedMessageContent content={message.content} />
                     {message.sources && message.sources.length > 0 && (
                       <SourceCitations sources={message.sources} />
                     )}
+                    <div className="mt-1 flex items-center gap-3">
+                      <span className="text-[10px] opacity-50">
+                        {formatTimestamp(message.created_at)}
+                      </span>
+                      {message.role === "assistant" && !message.id.startsWith("pending-") && (
+                        <div className="flex gap-2 opacity-0 transition-opacity group-hover:opacity-100">
+                          <button
+                            onClick={() => handleCopy(message)}
+                            className="text-[10px] font-medium underline-offset-2 hover:underline"
+                          >
+                            {copiedMessageId === message.id ? "Copied" : "Copy"}
+                          </button>
+                          {lastAssistantMessage?.id === message.id && (
+                            <button
+                              onClick={handleRegenerate}
+                              disabled={isSending}
+                              className="text-[10px] font-medium underline-offset-2 hover:underline disabled:opacity-50"
+                            >
+                              Regenerate
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))
             )}
             {isSending && (
               <div className="flex justify-start">
-                <div className="max-w-[80%] rounded-lg border border-black/10 px-4 py-2 text-sm text-black/50 dark:border-white/15 dark:text-white/50">
-                  Thinking…
+                <div className="max-w-[80%] rounded-lg border border-black/10 px-4 py-2 text-sm dark:border-white/15">
+                  {streamingText ? (
+                    <FormattedMessageContent content={streamingText} />
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-black/50 dark:text-white/50">
+                      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-current [animation-delay:-0.3s]" />
+                      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-current [animation-delay:-0.15s]" />
+                      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-current" />
+                    </span>
+                  )}
                 </div>
               </div>
             )}
@@ -559,13 +697,22 @@ function ChatContent() {
               rows={1}
               className="flex-1 resize-none rounded-lg border border-black/10 bg-transparent px-4 py-2 text-sm outline-none focus:border-black/30 dark:border-white/15 dark:focus:border-white/40"
             />
-            <button
-              onClick={handleSend}
-              disabled={isSending || !input.trim()}
-              className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white transition hover:bg-black/80 disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-white/80"
-            >
-              Send
-            </button>
+            {isSending ? (
+              <button
+                onClick={handleStop}
+                className="rounded-lg border border-black/20 px-4 py-2 text-sm font-medium transition hover:bg-black/5 dark:border-white/25 dark:hover:bg-white/10"
+              >
+                Stop
+              </button>
+            ) : (
+              <button
+                onClick={() => handleSend()}
+                disabled={!input.trim()}
+                className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-accent-foreground transition hover:bg-accent/90 disabled:opacity-50 dark:bg-accent dark:text-accent-foreground dark:hover:bg-accent/90"
+              >
+                Send
+              </button>
+            )}
           </div>
         </div>
       </div>

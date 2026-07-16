@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
 
 import { useAuth } from "@/context/AuthContext";
+import { ThemeToggle } from "./ThemeToggle";
 
 const NAV_LINKS = [
   { href: "/dashboard", label: "Dashboard" },
@@ -18,16 +19,20 @@ export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
+  const navLinks =
+    user?.role === "admin" ? [...NAV_LINKS, { href: "/admin", label: "Admin" }] : NAV_LINKS;
+
   return (
     <div className="flex min-h-full flex-1 flex-col">
       <header className="border-b border-black/10 dark:border-white/15">
         <div className="flex h-14 items-center justify-between px-4 sm:px-6">
           <div className="flex items-center gap-6">
-            <Link href="/dashboard" className="text-sm font-semibold tracking-tight">
+            <Link href="/dashboard" className="flex items-center gap-1.5 text-sm font-semibold tracking-tight">
+              <span className="h-1.5 w-1.5 rounded-full bg-accent" aria-hidden="true" />
               Orin
             </Link>
             <nav className="hidden items-center gap-1 sm:flex">
-              {NAV_LINKS.map((link) => {
+              {navLinks.map((link) => {
                 const isActive = pathname === link.href || pathname.startsWith(`${link.href}/`);
                 return (
                   <Link
@@ -35,7 +40,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                     href={link.href}
                     className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
                       isActive
-                        ? "bg-black/10 dark:bg-white/15"
+                        ? "bg-accent/10 text-accent dark:bg-accent/15 dark:text-accent"
                         : "text-black/60 hover:bg-black/5 hover:text-black dark:text-white/60 dark:hover:bg-white/10 dark:hover:text-white"
                     }`}
                   >
@@ -47,6 +52,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
 
           <div className="hidden items-center gap-3 sm:flex">
+            <ThemeToggle />
             {user && (
               <span className="max-w-[160px] truncate text-sm text-black/50 dark:text-white/50">
                 {user.full_name || user.email}
@@ -78,7 +84,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
         {isMenuOpen && (
           <nav className="flex flex-col gap-1 border-t border-black/10 px-4 py-3 dark:border-white/15 sm:hidden">
-            {NAV_LINKS.map((link) => {
+            {navLinks.map((link) => {
               const isActive = pathname === link.href || pathname.startsWith(`${link.href}/`);
               return (
                 <Link
@@ -87,7 +93,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                   onClick={() => setIsMenuOpen(false)}
                   className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
                     isActive
-                      ? "bg-black/10 dark:bg-white/15"
+                      ? "bg-accent/10 text-accent dark:bg-accent/15 dark:text-accent"
                       : "text-black/60 hover:bg-black/5 dark:text-white/60 dark:hover:bg-white/10"
                   }`}
                 >
@@ -96,6 +102,9 @@ export function AppShell({ children }: { children: ReactNode }) {
               );
             })}
             <div className="mt-2 flex items-center justify-between border-t border-black/10 pt-3 dark:border-white/15">
+              <ThemeToggle />
+            </div>
+            <div className="mt-2 flex items-center justify-between">
               {user && (
                 <span className="truncate text-sm text-black/50 dark:text-white/50">
                   {user.full_name || user.email}

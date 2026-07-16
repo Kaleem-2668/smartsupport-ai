@@ -1,3 +1,4 @@
+from app.core.config import get_settings
 from app.core.security import (
     create_access_token,
     create_refresh_token,
@@ -16,6 +17,8 @@ from app.domain.schemas.user import UserCreate
 from app.models.user import User
 from app.repositories.user_repository import UserRepository
 
+settings = get_settings()
+
 
 class AuthService:
     """Business rules for registration, login, and token refresh.
@@ -30,10 +33,19 @@ class AuthService:
         if existing is not None:
             raise EmailAlreadyExistsError(f"An account with {data.email} already exists")
 
+        # Bootstrap: whoever registers with the configured first-admin email becomes an
+        # admin automatically. Every admin after that is promoted via the admin UI.
+        is_first_admin = (
+            settings.first_admin_email is not None
+            and data.email.strip().lower() == settings.first_admin_email.strip().lower()
+        )
+        role = "admin" if is_first_admin else "user"
+
         return await self._users.create(
             email=data.email,
             hashed_password=hash_password(data.password),
             full_name=data.full_name,
+            role=role,
         )
 
     async def authenticate(self, email: str, password: str) -> User:

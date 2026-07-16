@@ -187,7 +187,7 @@ function UploadPageContent() {
           <button
             onClick={handleUpload}
             disabled={!file || isUploading}
-            className="w-full rounded-lg bg-black px-4 py-2.5 text-sm font-medium text-white transition hover:bg-black/80 disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-white/80"
+            className="w-full rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-accent-foreground transition hover:bg-accent/90 disabled:opacity-50 dark:bg-accent dark:text-accent-foreground dark:hover:bg-accent/90"
           >
             {isUploading ? "Uploading..." : "Upload Document"}
           </button>

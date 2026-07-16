@@ -23,6 +23,13 @@ class DocumentRepository:
         )
         return list(result.scalars().all())
 
+    async def list_recent(self, limit: int = 50) -> list[Document]:
+        """Admin-facing: most recently uploaded documents across ALL users."""
+        result = await self._session.execute(
+            select(Document).order_by(Document.created_at.desc()).limit(limit)
+        )
+        return list(result.scalars().all())
+
     async def get_by_ids(self, document_ids: list[UUID]) -> list[Document]:
         if not document_ids:
             return []

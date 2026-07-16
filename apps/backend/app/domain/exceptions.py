@@ -44,3 +44,7 @@ class LLMError(DomainError):
 
 class KnowledgeBaseNotFoundError(DomainError):
     pass
+
+
+class InsufficientPermissionsError(DomainError):
+    pass

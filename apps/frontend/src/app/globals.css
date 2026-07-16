@@ -1,22 +1,41 @@
 @import "tailwindcss";
 
+/* Drive dark: utilities from a .dark class instead of only prefers-color-scheme, so a
+   manual toggle can override the OS setting. See ThemeProvider for the toggle logic. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #18181b;
+  --accent: #4f46e5;
+  --accent-foreground: #ffffff;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
+/* Default: follow the OS, unless the user explicitly chose light mode */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not(.light) {
     --background: #0a0a0a;
-    --foreground: #ededed;
+    --foreground: #f4f4f5;
+    --accent: #818cf8;
+    --accent-foreground: #0a0a0a;
   }
+}
+
+/* Explicit user choice always wins over the OS setting */
+:root.dark {
+  --background: #0a0a0a;
+  --foreground: #f4f4f5;
+  --accent: #818cf8;
+  --accent-foreground: #0a0a0a;
 }
 
 body {

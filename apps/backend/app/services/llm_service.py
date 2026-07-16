@@ -64,3 +64,20 @@ class LLMService:
             return response.content
         except Exception as exc:
             raise RuntimeError(f"Failed to generate chat completion: {exc}") from exc
+
+    async def generate_answer_stream(self, system_prompt: str, question: str):
+        """Same as generate_answer, but yields the response incrementally as it's
+        generated. LangChain's .astream() gives the same token-chunking behavior across
+        providers, so this works unchanged for both Gemini and OpenAI."""
+        if not self._chat_model:
+            raise RuntimeError("Chat model not initialized")
+
+        try:
+            from langchain_core.messages import HumanMessage, SystemMessage
+
+            messages = [SystemMessage(content=system_prompt), HumanMessage(content=question)]
+            async for chunk in self._chat_model.astream(messages):
+                if chunk.content:
+                    yield chunk.content
+        except Exception as exc:
+            raise RuntimeError(f"Failed to generate streaming chat completion: {exc}") from exc
